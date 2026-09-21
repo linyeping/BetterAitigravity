@@ -70,7 +70,7 @@ class BetterGravityInstallerApp(Gtk.Application):
         self.sync_pill.append(self.sync_lbl)
         header.append(self.sync_pill)
 
-        self.ver_lbl = Gtk.Label(label="v3.0.0")
+        self.ver_lbl = Gtk.Label(label="v3.0.2")
         self.ver_lbl.add_css_class("version-text")
         header.append(self.ver_lbl)
         root.append(header)
@@ -316,22 +316,22 @@ class BetterGravityInstallerApp(Gtk.Application):
 
     def sync_bootstrapper(self):
         import urllib.request
-        manifest_url = "https://raw.githubusercontent.com/YashjitPal/BetterGravity/main/apps/installer-windows/Patcher/manifest.json"
+        manifest_url = "https://raw.githubusercontent.com/linyeping/BetterAitigravity/main/apps/installer-windows/Patcher/manifest.json"
         cache_dir = os.path.expanduser("~/.local/share/BetterGravity/PatcherCache")
         runtime_dir = os.path.join(cache_dir, "runtime")
 
         try:
-            req = urllib.request.Request(manifest_url, headers={"User-Agent": "BetterGravity-Bootstrapper-Linux/3.0.0"})
+            req = urllib.request.Request(manifest_url, headers={"User-Agent": "BetterGravity-Bootstrapper-Linux/3.0.2"})
             with urllib.request.urlopen(req, timeout=5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode("utf-8"))
-                    version = data.get("version", "3.0.0")
+                    version = data.get("version", "3.0.2")
                     os.makedirs(runtime_dir, exist_ok=True)
                     GLib.idle_add(self.update_bootstrapper_ui, version, "LATEST")
                     return
         except Exception:
             pass
-        GLib.idle_add(self.update_bootstrapper_ui, "3.0.0", "OFFLINE")
+        GLib.idle_add(self.update_bootstrapper_ui, "3.0.2", "OFFLINE")
 
 if __name__ == '__main__':
     app = BetterGravityInstallerApp()

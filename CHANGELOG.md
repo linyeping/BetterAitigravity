@@ -4,6 +4,48 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.2] - 2026-09-21
+
+### Changed
+
+- **Content resolves against our own fork.** The catalog repository constant in
+  `packages/runtime/src/main/marketplace.ts` and the manifest/raw URLs in all four
+  installers now read `linyeping/BetterAitigravity` instead of `YashjitPal/BetterGravity`.
+  Two things follow: the Community page installs the plugins this fork publishes, not
+  upstream's; and a future upstream patcher release can no longer overwrite the runtime
+  bundle this installer carries.
+- **Embedded patcher version raised to 3.0.2.** The bootstrapper only prefers a cached
+  bundle when it is strictly newer than the embedded one, so a `PatcherCache` populated by
+  3.0.1 is now ignored rather than trusted. A freshly installed 3.0.2 exe runs its own
+  bundle offline and never fetches the patcher.
+
+The Gemini App plugin content in this fork's catalog is at **0.5.4** (sidebar collapse
+button, project title drift, and account avatar fixes). Plugin versions remain independent
+of the installer version and are delivered through the Community page.
+
+## [3.0.1] - 2026-09-21
+
+### Fixed
+
+- **Gemini App 0.5.1 — Sidebar project titles and the account avatar**:
+  - A collapsed project header lost its first letter. `getReferenceLeft` aligns the
+    title with the conversation rows below it, and falls back to the rail's own
+    14px when there are none — which is the case whenever every project is
+    collapsed. That fallback asked for a negative `margin-left`, and the
+    `overflow: hidden` boxes around the title turn a negative margin into a
+    clip: `GemMate` rendered as `emMate` until the project was expanded again.
+    The title's left edge now comes from the button's padding (14px, the same
+    place Willow's own sidebar puts it), and `applySubheadingOffset` never moves
+    a title left of that edge — it only ever nudges one right, which is harmless.
+  - The account avatar in the sidebar footer was drawn offset, with a blue sliver
+    down the right of the circle. The picture and the initial were laid out as
+    flex siblings inside the 28px circle, so two 28px boxes overflowed a 28px
+    centred row: the image was dragged 4.5px left and the initial was pushed off
+    the right edge. The two layers are now stacked with `inset: 0`, and which one
+    is painted is decided by `data-avatar` on the pill. The old inline
+    `display: none` never worked at all — the stylesheet shows the image with
+    `!important`, which outranks an inline declaration.
+
 ## [3.0.0] - 2026-09-19
 
 ### Added

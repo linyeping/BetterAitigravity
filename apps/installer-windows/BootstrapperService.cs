@@ -27,9 +27,9 @@ public class RemoteManifest
 
 public static class BootstrapperService
 {
-    public const string EmbeddedVersion = "3.0.0";
-    private const string ManifestUrl = "https://raw.githubusercontent.com/YashjitPal/BetterGravity/main/apps/installer-windows/Patcher/manifest.json";
-    private const string RawBaseUrl = "https://raw.githubusercontent.com/YashjitPal/BetterGravity/main/";
+    public const string EmbeddedVersion = "3.0.2";
+    private const string ManifestUrl = "https://raw.githubusercontent.com/linyeping/BetterAitigravity/main/apps/installer-windows/Patcher/manifest.json";
+    private const string RawBaseUrl = "https://raw.githubusercontent.com/linyeping/BetterAitigravity/main/";
 
     private static readonly HttpClient HttpClient = new()
     {
@@ -83,10 +83,38 @@ public static class BootstrapperService
         }
     }
 
+    /**
+     * The version recorded in the last synced manifest, or null.
+     *
+     * The cache is only worth preferring when it came from a release newer than
+     * the one inside this executable. A cache left behind by an older one would
+     * otherwise outrank the bundle the installer carries, and a local build
+     * would deploy last release's runtime.
+     */
+    private static string? CachedVersion()
+    {
+        try
+        {
+            var manifestPath = Path.Combine(CacheDirectory, "manifest.json");
+            if (!File.Exists(manifestPath)) return null;
+            var cached = JsonSerializer.Deserialize<RemoteManifest>(File.ReadAllText(manifestPath), new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            return cached?.Version;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public static string? GetActivePatcherScriptPath()
     {
         try
         {
+            if (!IsNewer(CachedVersion(), EmbeddedVersion)) return null;
+
             var cachedPatcher = Path.Combine(CacheDirectory, "patcher-cli.cjs");
             if (File.Exists(cachedPatcher) && new FileInfo(cachedPatcher).Length > 10_000)
             {
@@ -104,7 +132,7 @@ public static class BootstrapperService
     {
         try
         {
-            if (Directory.Exists(RuntimeCacheDirectory))
+            if (IsNewer(CachedVersion(), EmbeddedVersion) && Directory.Exists(RuntimeCacheDirectory))
             {
                 var mainFile = Path.Combine(RuntimeCacheDirectory, "main.cjs");
                 var preloadFile = Path.Combine(RuntimeCacheDirectory, "preload.cjs");
@@ -127,6 +155,14 @@ public static class BootstrapperService
         State = newState;
         StatusMessage = message;
         StateChanged?.Invoke(newState, message);
+    }
+
+    /** True when `candidate` parses as a version strictly above `baseline`. */
+    private static bool IsNewer(string? candidate, string baseline)
+    {
+        return Version.TryParse(candidate, out var remote)
+            && Version.TryParse(baseline, out var local)
+            && remote > local;
     }
 
     private static string ComputeSha256(byte[] data)
@@ -170,6 +206,18 @@ public static class BootstrapperService
             }
 
             ActiveVersion = manifest.Version;
+
+            // The published bundle wins only when it is actually newer. This
+            // build carries its own runtime and patcher, so syncing a `main`
+            // that is behind the embedded version would quietly replace them
+            // with older files and undo whatever this build changed. A newer
+            // release still gets picked up, which is what the sync is for.
+            if (!IsNewer(manifest.Version, EmbeddedVersion))
+            {
+                UpdateState(BootstrapperState.UpToDate, $"Using bundled patcher (v{EmbeddedVersion})");
+                return true;
+            }
+
             bool anyDownloaded = false;
 
             if (manifest.Files.ValueKind == JsonValueKind.Object)

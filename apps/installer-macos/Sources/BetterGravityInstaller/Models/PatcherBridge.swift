@@ -18,7 +18,7 @@ class InstallerModel: ObservableObject {
     @Published var isBusy: Bool = false
     @Published var progress: OperationProgress? = nil
     @Published var alertMessage: String? = nil
-    @Published var activeVersion: String = "v3.0.0"
+    @Published var activeVersion: String = "v3.0.2"
     @Published var syncState: String = "ONLINE"
 
     init() {
@@ -30,7 +30,7 @@ class InstallerModel: ObservableObject {
 
     func syncBootstrapper() async {
         syncState = "SYNCING"
-        guard let url = URL(string: "https://raw.githubusercontent.com/YashjitPal/BetterGravity/main/apps/installer-windows/Patcher/manifest.json") else {
+        guard let url = URL(string: "https://raw.githubusercontent.com/linyeping/BetterAitigravity/main/apps/installer-windows/Patcher/manifest.json") else {
             syncState = "OFFLINE"
             return
         }
