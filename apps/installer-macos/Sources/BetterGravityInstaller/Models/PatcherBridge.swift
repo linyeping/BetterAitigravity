@@ -18,7 +18,7 @@ class InstallerModel: ObservableObject {
     @Published var isBusy: Bool = false
     @Published var progress: OperationProgress? = nil
     @Published var alertMessage: String? = nil
-    @Published var activeVersion: String = "v3.0.2"
+    @Published var activeVersion: String = "v3.0.3"
     @Published var syncState: String = "ONLINE"
 
     init() {

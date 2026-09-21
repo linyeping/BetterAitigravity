@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.3] - 2026-09-21
+
+### Changed
+
+- **The account card follows an account switch.** The sidebar footer kept showing the
+  first account signed in during the session. The three reads that kept it current — the
+  body observer, the timed refresh chain, and the cookie fallback — were each shut off as
+  soon as one complete profile had been read, so switching to a second account never
+  reached the card. The observer now stays mounted for the life of the plugin, the refresh
+  chain keeps a 30 s heartbeat once the burst retries are exhausted, and the card is
+  cleared before the incoming account is read so the previous account's avatar cannot
+  survive the switch.
+- **Embedded patcher version raised to 3.0.3**, so a `PatcherCache` written by 3.0.2 is
+  ignored rather than trusted.
+
+This installer carries no plugin content. The account fix above ships through the
+Community page, which means an installation already running 3.0.2 picks it up without
+reinstalling — the installer version is only relevant when the runtime or patcher changes.
+The Gemini App plugin in this fork's catalog is at **0.5.6**; plugin versions are
+independent of the installer version.
+
 ## [3.0.2] - 2026-09-21
 
 ### Changed
