@@ -4,6 +4,38 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.4] - 2026-09-21
+
+### Added
+
+- **The native title bar follows the enabled theme.** Antigravity draws its window
+  controls with `titleBarStyle: 'hidden'` plus a `titleBarOverlay`, and takes the
+  overlay colours from its own `getThemeMode()`, which defaults to dark — so a light
+  theme left a dark block behind the minimise, maximise and close buttons. Being
+  outside the DOM, no stylesheet can reach that layer. The preload now resolves
+  `--sidebar` and `--foreground` from the document root once a theme is applied and
+  sends them over a new `bettergravity:title-bar-overlay` channel; the main process
+  applies them to every window. `--sidebar` rather than `--background`, because the
+  band under the overlay is driven by `--sidebar` alone — `--background`, `--card` and
+  `--sidebar-secondary` all leave it untouched.
+
+### Changed
+
+- **A theme is listed as a name and a switch.** The rows used to print the header's
+  description and an `author · version` credit under every name. A theme is its
+  palette, and that provenance belongs to the catalog rather than to the row a user
+  decides on. Searching matches the name and the id now, instead of the description
+  and the author.
+- **`@name` is the only header field a theme has to carry.** `@description`,
+  `@author` and `@version` are optional in the validator and in the scaffold, and a
+  blank annotation is dropped rather than serialised into the catalog.
+
+### Removed
+
+- **Catppuccin Turbo and Midnight**, the two themes this fork inherited from upstream.
+  The catalog carries four instead: Claude Light, Claude Dark, Tokyo Night and Codex
+  Light.
+
 ## [3.0.3] - 2026-09-21
 
 ### Changed
