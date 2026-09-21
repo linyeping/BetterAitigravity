@@ -219,7 +219,28 @@ div.bg-border.flex-shrink-0.w-\[1px\] {
   user-select: none !important;
 }
 
-/* Collapsed logo hover state: logo scales down and fades out; expand icon scales up and fades in */
+/* Collapsed rail: the expand glyph stands in the mark's place, permanently.
+ *
+ * Willow reveals it on hover only (Sidebar.tsx:1460-1479) — the mark is drawn
+ * at rest and `side_nav_expand` takes its place when the pointer arrives. That
+ * reads as a decorative logo with a hidden button under it, which is exactly
+ * how it was reported: "the button that opens the collapsed sidebar is gone".
+ * The rail is 52px wide and this button is the only way back out, so here the
+ * glyph is the resting state; hover keeps the tint and the nudge, nothing more.
+ *
+ * Same box either way: `.gemini-logo-expand-wrap` is `inset: 0` over the 22px
+ * mark, both inside the 32px button, so the swap cannot move the target — only
+ * which layer is painted. */
+[role="navigation"][aria-label="Sidebar"][data-collapsed="true"] .gemini-logo-wrap {
+  opacity: 0 !important;
+  transform: scale(0.75) !important;
+}
+
+[role="navigation"][aria-label="Sidebar"][data-collapsed="true"] .gemini-logo-expand-wrap {
+  opacity: 1 !important;
+  transform: scale(1);
+}
+
 [role="navigation"][aria-label="Sidebar"][data-collapsed="true"] .gemini-logo-btn:hover {
   background-color: rgba(255, 255, 255, 0.08) !important;
 }
@@ -272,12 +293,11 @@ div.bg-border.flex-shrink-0.w-\[1px\] {
   }
 }
 
-@keyframes willow-sidenav-show-close-button {
-  to {
-    opacity: 1;
-    visibility: visible;
-  }
-}
+/* `willow-sidenav-show-close-button` lived here. It was how the close toggle
+ * was revealed when the sidebar opened, with `opacity: 0; visibility: hidden`
+ * as the resting state and a 250ms delay before the 50ms ramp. Replaced by
+ * static declarations on the button itself: the reveal only worked when the
+ * animation ran to completion, and a dropped frame left the button gone. */
 
 .willow-sidenav-text {
   margin-left: 6px !important;
@@ -360,8 +380,20 @@ div:has(+ div > [data-testid="sidebar-toggle"]):has(svg),
 }
 
 /* Closed, Willow's rail hides the close toggle completely: the collapsed logo
- * button assumes the expand role with `side_nav_expand` on hover. */
-[data-testid="sidebar-toggle"][aria-label*="Toggle Sidebar"][aria-expanded="false"],
+ * button assumes the expand role (see the rail rules under the header band).
+ *
+ * Collapsed state only. This list used to lead with a bare
+ * `[aria-expanded="false"]`, read as "the sidebar is closed" — but the document
+ * holds a *second* toggle, in a hidden pane parked off screen at x=1870, whose
+ * own attribute stays `true`; the first version read whichever one the selector
+ * reached first. `aria-expanded` on the sidebar's own button is truthful (it is
+ * `false` exactly when `--sidebar-width` is `0px`, measured on the running
+ * window), and that pair is what index.js reads the state from now.
+ *
+ * The three selectors below describe a closed sidebar through the flag the
+ * plugin maintains: Antigravity's own `html[data-sidebar-collapsed]` (set by
+ * index.js from `--sidebar-width`), and the same flag reached through the
+ * rail's ancestors for the two shapes the DOM is seen in. */
 html[data-sidebar-collapsed="true"] [data-testid="sidebar-toggle"][aria-label="Toggle Sidebar"],
 [role="navigation"][aria-label="Sidebar"][data-collapsed="true"] ~ * [data-testid="sidebar-toggle"][aria-label="Toggle Sidebar"],
 div:has(> [role="navigation"][aria-label="Sidebar"][data-collapsed="true"]) ~ * [data-testid="sidebar-toggle"][aria-label="Toggle Sidebar"] {
@@ -373,8 +405,16 @@ div:has(> [role="navigation"][aria-label="Sidebar"][data-collapsed="true"]) ~ * 
 
 /* Open, the button crosses the rail to Willow's corner: 288 − 14 − 40 = 234,
  * `top-1.5` = 6, `h-10 w-10 rounded-full text-[#e3e3e3] hover:bg-white/[0.08]`.
- * Willow's staged reveal: lands 50ms before the 300ms width settles (250ms delay)
- * so the button never paints over a rail that is still narrower than itself. */
+ *
+ * Visible from the cascade, not from an animation. It used to sit at
+ * `opacity: 0` here and be revealed by a delayed `forwards` keyframe, which
+ * made the button's existence depend on that animation reaching its end. It
+ * does not need to: the wrapper around the rail is `overflow: hidden`, so while
+ * the width ramps 52px → 288px the button is clipped by the wrapper on its own
+ * and comes into view as the ramp passes x=234 — the staging was already
+ * handled, and the animation only added a way for the button to be missing.
+ * `!important` here is deliberate and is what keeps it out of reach of any
+ * animation: the closed-state rules above override it on specificity. */
 [data-testid="sidebar-toggle"][aria-label*="Toggle Sidebar"] {
   position: absolute !important;
   left: 234px !important;
@@ -384,9 +424,8 @@ div:has(> [role="navigation"][aria-label="Sidebar"][data-collapsed="true"]) ~ * 
   border-radius: 9999px !important;
   color: var(--gemini-body-text, #e3e3e3) !important;
   background-color: transparent !important;
-  opacity: 0;
-  visibility: hidden;
-  animation: willow-sidenav-show-close-button 50ms linear 250ms forwards !important;
+  opacity: 1 !important;
+  visibility: visible !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -814,15 +853,20 @@ html[data-sidebar-collapsed="true"] [role="navigation"][aria-label="Sidebar"] .g
  * Antigravity spends 29px before the first heading where Willow spends 12,
  * and stacks it out of three places: an invisible 1px divider with `mt-3`
  * above it, then `py-3` on the scroller, then `pt-1` inside the heading's own
- * virtual slot. The first two go, leaving the heading to carry Willow's 12
- * itself — the same 12 that then separates every project from the chat above
- * it, since it is the one number in play.
+ * virtual slot. The first two go, leaving the heading to carry the gap itself.
+ *
+ * That gap is 1px, not Willow's 12. A collapsed project is a bare title — there
+ * is no row underneath it to separate it from — so 12px above a 32px heading
+ * read as 44px of pitch against 33px for every nav row above it, and a stack of
+ * collapsed projects looked like a list with the line spacing turned up. The
+ * heading now carries the same 1px the nav rows do (`.gemini-nav-item` is
+ * `my-0.5` on both sides, 32 + 0.5 + 0.5 = 33), so the whole rail — nav rows,
+ * headings, and the rows under an open project — reads as one rhythm.
  *
  * The chat list is a dynamic virtualiser: it places each slot at a measured
  * `translateY` rather than in flow. It does re-measure when these heights
  * change, so the pitch follows the rules below instead of fighting them —
- * verified live, heading slots 44px (12 + 32) and chat slots 32px, which is
- * Willow's `mt-3` + `h-8` and `h-8` exactly.
+ * verified live, heading slots 33px (1 + 32) and chat slots 32px.
  * ------------------------------------------------------------------------- */
 
 /* The rule between the nav block and the list paints nothing
@@ -840,10 +884,10 @@ html[data-sidebar-collapsed="true"] [role="navigation"][aria-label="Sidebar"] .g
   row-gap: 0 !important;
 }
 
-/* Heading slot: Willow's `mt-3` + `h-8` (SidebarPrimitives.tsx:162), against
- * Antigravity's 4 + 32 + 1. */
+/* Heading slot: Antigravity's 4 + 32 + 1, held to 1 + 32 so the heading sits on
+ * the nav rows' 33px pitch instead of a 44px one. */
 [role="navigation"][aria-label="Sidebar"] div[class*="pt-1"][class*="pb-[1px]"] {
-  padding-top: 12px !important;
+  padding-top: 1px !important;
   padding-bottom: 0 !important;
 }
 
@@ -1538,7 +1582,7 @@ body.gemini-custom-view-open [role="navigation"][aria-label="Sidebar"] #gemini-s
 /* ---------------------------------------------------------------------------
  * Subheadings (Project group headers) — Willow Styling
  * - Remove folder icon
- * - Align horizontal text start to Willow (14px from sidebar rail: 6px + 8px)
+ * - Align horizontal text start to the conversation rows (18px: list 10px + row 8px)
  * - Reveal lower arrow (keyboard_arrow_down) on hover next to title
  * - Keep hover plus icon intact
  * ------------------------------------------------------------------------- */
@@ -1579,6 +1623,27 @@ body.gemini-custom-view-open [role="navigation"][aria-label="Sidebar"] #gemini-s
   gap: 0 !important;
 }
 
+/* 8px, fixed, and the same for every project in every state.
+ *
+ * The rail sits at x=10 (`conversation-list-sidebar` has `padding-left: 10px`)
+ * and a conversation row adds 8px of its own, so a row's text starts at 18px.
+ * The project heading is the row's parent in the list, and its title belongs on
+ * that same edge: 10 + 8 = 18.
+ *
+ * A constant, not a measurement, is the whole point. This used to be 4px with a
+ * runtime correction in index.js that read the title's own left edge and the
+ * conversation rows' left edge and wrote the difference back as a `margin-left`.
+ * Both edges move — rows exist only under an expanded project — so the two
+ * states disagreed: the expanded project was pushed 4px right onto its rows
+ * while its collapsed siblings stayed at 14px, and toggling a heading flipped
+ * which side of that it was on, a frame behind a 500ms cached reference. That
+ * is the visible left/right drift, and the reason one project's name never lined
+ * up with the others. A negative result of that same arithmetic is what used to
+ * clip the first glyph — "GemMate" arriving as "emMate" — because the box around
+ * the title is `overflow: hidden` and clips at its own left edge.
+ *
+ * The padding is the box the title actually lives in, so the offset belongs
+ * here, where it cannot vary. index.js no longer touches the title's margin. */
 [role="navigation"][aria-label="Sidebar"] .group\/headerbtn,
 [role="navigation"][aria-label="Sidebar"] button[class*="group/headerbtn"] {
   padding-left: 8px !important;
@@ -2500,6 +2565,17 @@ div:has(> [role="menu"][data-gemini-conversation-menu]) {
   background-color: var(--gemini-row-pressed, rgba(230, 230, 230, 0.12)) !important;
 }
 
+/* The two layers are stacked inside the circle rather than laid out beside each
+ * other. As flex siblings they were two 28px boxes in a 28px box, so the flex
+ * line overflowed its centred container: the avatar image was dragged 4.5px
+ * left and the initial fell off the right edge, leaving a blue sliver down the
+ * side of a circle that looked shifted (measured: wrap 12-40, image 8-36,
+ * initial 36-45).
+ *
+ * Which layer is painted is driven by `data-avatar` on the pill — set by
+ * index.js from whether the profile has a picture — because hiding a layer has
+ * to be said with `!important` and an inline `display: none` loses to the
+ * `!important` rule that shows it. */
 #gemini-sidebar-user-pill .gemini-user-avatar-wrap {
   width: 28px !important;
   height: 28px !important;
@@ -2518,28 +2594,46 @@ div:has(> [role="menu"][data-gemini-conversation-menu]) {
   aspect-ratio: 1 / 1 !important;
 }
 
-#gemini-sidebar-user-pill .gemini-user-avatar {
+#gemini-sidebar-user-pill .gemini-user-avatar,
+#gemini-sidebar-user-pill .gemini-user-avatar-fallback {
+  position: absolute !important;
+  inset: 0 !important;
   width: 100% !important;
   height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
   border-radius: 50% !important;
-  object-fit: cover !important;
   aspect-ratio: 1 / 1 !important;
+  box-sizing: border-box !important;
+}
+
+#gemini-sidebar-user-pill .gemini-user-avatar {
+  object-fit: cover !important;
   display: block !important;
 }
 
 #gemini-sidebar-user-pill .gemini-user-avatar-fallback {
-  width: 100% !important;
-  height: 100% !important;
-  border-radius: 50% !important;
   background: #1a73e8 !important;
   color: #ffffff !important;
   font-family: var(--gemini-font, "Google Sans Flex", sans-serif) !important;
   font-size: 13px !important;
   font-weight: 500 !important;
-  display: none;
+  display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   text-transform: uppercase !important;
+}
+
+/* No picture on the profile: the initial is the whole circle. */
+#gemini-sidebar-user-pill[data-avatar="initial"] .gemini-user-avatar {
+  display: none !important;
+}
+
+/* A picture that loaded: the initial stays behind it, unpainted. */
+#gemini-sidebar-user-pill[data-avatar="image"] .gemini-user-avatar-fallback {
+  display: none !important;
 }
 
 #gemini-sidebar-user-pill .gemini-user-text {

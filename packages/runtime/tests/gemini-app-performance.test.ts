@@ -87,13 +87,18 @@ afterEach(() => {
 
 describe("Gemini App repeated work", () => {
   it("restores sidebar collapse handlers when starting on an already mounted page", async () => {
-    document.body.innerHTML = '<div><div><nav role="navigation" aria-label="Sidebar"><div class="shrink-0 flex items-center"></div><div class="px-2"><div class="flex flex-col"><button data-testid="new-conversation-button">New conversation</button><button data-testid="history-button">History</button></div></div><div class="relative"><div data-testid="conversation-list-sidebar"></div></div></nav></div></div><button data-testid="sidebar-toggle" aria-label="Toggle Sidebar" aria-expanded="true"></button>';
+    document.body.innerHTML = '<div style="--sidebar-width: 256px"><div><nav role="navigation" aria-label="Sidebar"><div class="shrink-0 flex items-center"></div><div class="px-2"><div class="flex flex-col"><button data-testid="new-conversation-button">New conversation</button><button data-testid="history-button">History</button></div></div><div class="relative"><div data-testid="conversation-list-sidebar"></div></div></nav></div></div><button data-testid="sidebar-toggle" aria-label="Toggle Sidebar" aria-expanded="true"></button>';
     const sidebar = document.querySelector<HTMLElement>('nav[aria-label="Sidebar"]')!;
     const toggle = document.querySelector<HTMLButtonElement>('[data-testid="sidebar-toggle"]')!;
     const frame = sidebar.parentElement!.parentElement!;
+    // The host owns the open/closed state and announces it as `--sidebar-width`
+    // on the shell (0px closed, 256px open); the plugin's flag follows it rather
+    // than predicting from the button, which is what this test drives now.
+    const widthHost = document.querySelector<HTMLElement>("div[style]")!;
     for (let cycle = 0; cycle < 2; cycle++) {
       startPlugin(true);
       await settle();
+      expect(sidebar.dataset.collapsed).toBe("false");
       const extraButton = document.createElement("button");
       extraButton.setAttribute("data-bettergravity-button", "reload-check");
       sidebar.querySelector(".px-2 > .flex-col")!.append(extraButton);
@@ -101,10 +106,12 @@ describe("Gemini App repeated work", () => {
       expect(extraButton.parentElement).toBe(document.getElementById("gemini-scroll-nav"));
       extraButton.remove();
       toggle.click();
-      expect(sidebar.dataset.collapsed).toBe("true");
+      widthHost.style.setProperty("--sidebar-width", "0px");
       toggle.setAttribute("aria-expanded", "false");
       await settle();
+      expect(sidebar.dataset.collapsed).toBe("true");
       expect(frame.style.width).toBe("52px");
+      widthHost.style.setProperty("--sidebar-width", "256px");
       toggle.setAttribute("aria-expanded", "true");
       await settle();
       expect(sidebar.dataset.collapsed).toBe("false");

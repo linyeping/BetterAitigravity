@@ -647,14 +647,65 @@ const WILLOW_SIDEBAR_EXPANDED_WIDTH = "288px";
 const WILLOW_SIDEBAR_COLLAPSED_WIDTH = "52px";
 const WILLOW_SIDEBAR_TRANSITION = "width 300ms cubic-bezier(0.2, 0, 0, 1), background-color 300ms cubic-bezier(0.2, 0, 0, 1)";
 const TOGGLE_SELECTOR = 'button[data-testid="sidebar-toggle"][aria-label="Toggle Sidebar"]';
+const SIDEBAR_WIDTH_VAR = "--sidebar-width";
+
+/* Where the host keeps this sidebar's state.
+ *
+ * The app shell writes the sidebar's own width, `0px` closed and `256px` open,
+ * to `--sidebar-width` on the `h-screen w-screen` root, and flips it in the
+ * same commit as the corner button's `aria-expanded`. That variable is the only
+ * signal that belongs to *this* sidebar, and the only one that still lands:
+ * the wrapper's width is pinned by styles/sidebar.css, so the host's own inline
+ * `width: 256px` on the wrapper never reaches the screen.
+ *
+ * Two other candidates were measured on the running window and both lie.
+ * The host's inline width is beaten by the pinned `288px !important`, so it
+ * describes nothing visible. And the document holds a *second*
+ * `[data-testid="sidebar-toggle"]`, in another pane parked off screen at
+ * x=1870 whose own `aria-expanded` stays `true` while this sidebar is closed —
+ * `document.querySelector` returns that one first. Reading it is what made the
+ * corner button look dead: the plugin concluded "open" on every click, re-pinned
+ * 288px, and swallowed the host's `0px` on the same frame. */
+function sidebarWidthHost(sidebar) {
+  let node = sidebar ? sidebar.parentElement : null;
+  while (node && node !== document.body) {
+    const inline = node.style ? node.style.getPropertyValue(SIDEBAR_WIDTH_VAR) : "";
+    if (inline) {
+      const width = parseFloat(inline);
+      if (Number.isFinite(width)) return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
 
 function isSidebarCollapsed() {
-  const toggle = document.querySelector(TOGGLE_SELECTOR);
-  if (toggle && toggle.hasAttribute("aria-expanded")) {
-    return toggle.getAttribute("aria-expanded") === "false";
-  }
   const sidebar = document.querySelector(SIDEBAR_SELECTOR);
+  const host = sidebarWidthHost(sidebar);
+  if (host) {
+    return parseFloat(host.style.getPropertyValue(SIDEBAR_WIDTH_VAR)) < 1;
+  }
   return sidebar?.getAttribute("data-collapsed") === "true";
+}
+
+/* The toggle that belongs to this sidebar.
+ *
+ * The sidebar pane and the floating toggle are siblings in the app's body row
+ * (`div.flex-1.flex.min-h-0.relative`), so the button to drive is the one found
+ * in a neighbouring child of that row. Falling back to `document.querySelector`
+ * would hand back the other pane's button, which is why the rail's expand path
+ * could not open anything: it clicked a toggle belonging to a hidden pane. */
+function sidebarToggleElement(sidebar) {
+  const pane = sidebar?.parentElement?.parentElement?.parentElement;
+  const row = pane?.parentElement;
+  if (row) {
+    for (const child of row.children) {
+      if (child === pane) continue;
+      const found = child.querySelector(TOGGLE_SELECTOR);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 let isEnforcingSidebarGeometry = false;
@@ -742,18 +793,25 @@ function ensureSidebarHeader(sidebar, collapsed) {
     `;
     logoBtn.addEventListener("click", () => {
       const sb = document.querySelector(SIDEBAR_SELECTOR);
-      if (sb && sb.getAttribute("data-collapsed") === "true") {
-        sb.setAttribute("data-collapsed", "false");
-        const gp = sb.parentElement?.parentElement;
-        if (gp) enforceSidebarGeometry(gp, false);
-        const toggle = document.querySelector(TOGGLE_SELECTOR);
-        if (toggle) toggle.click();
-      }
+      if (!sb || sb.getAttribute("data-collapsed") !== "true") return;
+      // Opening is the host's call: this presses the app's own toggle, whose
+      // commit flips `--sidebar-width` and, with it, this rail. The flag is
+      // written here as well so the rail answers on the same frame.
+      sb.setAttribute("data-collapsed", "false");
+      document.documentElement.setAttribute("data-sidebar-collapsed", "false");
+      const gp = sb.parentElement?.parentElement;
+      if (gp) enforceSidebarGeometry(gp, false);
+      sidebarToggleElement(sb)?.click();
     });
     header.prepend(logoBtn);
   }
 
-  const logoLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  // The rail's only control out is this button; open, it is the brand mark and
+  // its click handler does nothing (the close toggle sits in the corner, see
+  // styles/sidebar.css). Labelling it "Collapse sidebar" while open described
+  // an action the button does not have, so it only claims the expand role in
+  // the state where it has one.
+  const logoLabel = collapsed ? "Expand sidebar" : "Antigravity";
   if (logoBtn.getAttribute("aria-label") !== logoLabel) {
     logoBtn.setAttribute("aria-label", logoLabel);
   }
@@ -829,11 +887,30 @@ function updateSidebarItemsState(sidebar, collapsed) {
   }
 }
 
+const observedSidebarWidthHosts = new WeakSet();
+
+/* The host announces a collapse or an expand by writing `--sidebar-width` on
+ * the app shell. The toggle's `aria-expanded` is watched too (it changes in the
+ * same commit), but the width variable is the one the state is read from, so a
+ * collapse triggered by anything else — a menu item, a keyboard shortcut, a
+ * restored session — arrives here as well. */
+function observeSidebarWidthHost(host) {
+  if (!host || observedSidebarWidthHosts.has(host)) return;
+  observedSidebarWidthHosts.add(host);
+  const observer = new MutationObserver(() => {
+    const sidebar = document.querySelector(SIDEBAR_SELECTOR);
+    if (sidebar) syncSidebarState(sidebar);
+  });
+  observer.observe(host, { attributes: true, attributeFilter: ["style"] });
+  remember(host, observer);
+}
+
 function syncSidebarState(sidebar) {
   if (!sidebar) return;
   const grandParent = sidebar.parentElement?.parentElement;
   const collapsed = isSidebarCollapsed();
 
+  observeSidebarWidthHost(sidebarWidthHost(sidebar));
   enforceSidebarGeometry(grandParent, collapsed);
   if (sidebar.getAttribute("data-collapsed") !== String(collapsed)) {
     sidebar.setAttribute("data-collapsed", String(collapsed));
@@ -2897,22 +2974,16 @@ plugin.dom.observe(SIDEBAR_SELECTOR, (sidebar) => {
 plugin.dom.observe(TOGGLE_SELECTOR, (toggle) => {
   const sidebar = document.querySelector(SIDEBAR_SELECTOR);
   if (sidebar) syncSidebarState(sidebar);
-  listenToElement(toggle, "click", () => {
-    const sb = document.querySelector(SIDEBAR_SELECTOR);
-    if (sb) {
-      const willCollapse = toggle.getAttribute("aria-expanded") !== "false";
-      sb.setAttribute("data-collapsed", String(willCollapse));
-      document.documentElement.setAttribute("data-sidebar-collapsed", String(willCollapse));
-      const grandParent = sb.parentElement?.parentElement;
-      if (grandParent) enforceSidebarGeometry(grandParent, willCollapse);
-      ensureExperienceSwitch(sb);
-    }
-  });
+  // Which way the button went is the host's answer, not this handler's to
+  // guess. The previous version inverted the button's own attribute before the
+  // host had committed — off a stale value, and off the wrong button entirely
+  // (a second toggle in a hidden pane) — so it re-pinned the wrapper open on
+  // every press and the button read as dead.
   const toggleObserver = new MutationObserver(() => {
     const sb = document.querySelector(SIDEBAR_SELECTOR);
     if (sb) syncSidebarState(sb);
   });
-  toggleObserver.observe(toggle, { attributes: true, attributeFilter: ["aria-expanded", "class"] });
+  toggleObserver.observe(toggle, { attributes: true, attributeFilter: ["aria-expanded", "class", "style"] });
   remember(toggle, toggleObserver);
 });
 
@@ -3022,44 +3093,19 @@ plugin.onDispose(() => activeViewBodyObserver.disconnect());
 
 const HEADERBTN_SELECTOR = '.group\\/headerbtn, button[class*="group/headerbtn"]';
 
-let cachedReferenceLeft = 0;
-let cachedReferenceTime = 0;
-
-function getReferenceLeft(sidebar) {
-  const now = performance.now();
-  if (cachedReferenceLeft > 0 && (now - cachedReferenceTime) < 500) {
-    return cachedReferenceLeft;
-  }
-  const row = document.querySelector('[data-testid="conversation-row-sidebar"] span.truncate');
-  if (row) {
-    const r = row.getBoundingClientRect();
-    if (r.width > 0 && r.left > 0) {
-      cachedReferenceLeft = r.left;
-      cachedReferenceTime = now;
-      return r.left;
-    }
-  }
-  const header = document.querySelector('[data-testid="section-header"], .group\\/section-header, [role="navigation"][aria-label="Sidebar"] h2, [role="navigation"][aria-label="Sidebar"] h3');
-  if (header) {
-    const r = header.getBoundingClientRect();
-    if (r.width > 0 && r.left > 0) {
-      cachedReferenceLeft = r.left;
-      cachedReferenceTime = now;
-      return r.left;
-    }
-  }
-  if (sidebar) {
-    const val = sidebar.getBoundingClientRect().left + 14;
-    cachedReferenceLeft = val;
-    cachedReferenceTime = now;
-    return val;
-  }
-  return 14;
-}
-
 /**
- * Steps 1 to 3 of the alignment: everything that only writes. Returns the span
- * holding the title, which is what step 4 has to measure.
+ * The heading pass: clear everything in front of the title so it starts at the
+ * button's own left padding edge, and leave it there.
+ *
+ * The edge itself is a fixed 18px, set by the stylesheet and by step 2 below —
+ * the same for every project whether it is expanded or collapsed. Nothing here
+ * measures anything, and nothing writes a margin, both of which this used to do:
+ * a correction derived from the conversation rows could only be right for the
+ * projects that had rows, and the rows come and go with the expand state, so the
+ * same heading landed on a different edge depending on when it was last looked
+ * at. See the `padding-left: 8px` rule in sidebar.css for the full account.
+ *
+ * Returns the span holding the title, for callers that want the element.
  */
 function normaliseSubheading(btn) {
   const truncate = btn.querySelector('span.truncate, span[class*="truncate"]');
@@ -3090,7 +3136,10 @@ function normaliseSubheading(btn) {
     current = current.parentElement;
   }
 
-  // 2. Normalize btn padding
+  // 2. Put the title on the same fixed edge as a conversation row's text: the
+  // list sits at x=10 and a row adds 8px, so 10 + 8 = 18. Written here as well
+  // as in the stylesheet because this button is the box the offset is measured
+  // from, and an inline value is the one no other rule can outrank.
   if (btn.style.paddingLeft !== '8px') {
     btn.style.setProperty('padding-left', '8px', 'important');
     btn.style.setProperty('margin-left', '0px', 'important');
@@ -3105,44 +3154,23 @@ function normaliseSubheading(btn) {
   return truncate;
 }
 
-/** Step 4: the correction itself, from a measurement taken by the caller. */
-function applySubheadingOffset(truncate, headingLeft, targetLeft) {
-  if (!(headingLeft > 0) || !(targetLeft > 0)) return;
-  const diff = headingLeft - targetLeft;
-  if (Math.abs(diff) <= 0.5 || Math.abs(diff) >= 80) return;
-  const currentMargin = parseFloat(truncate.style.marginLeft || '0');
-  const targetMargin = `${currentMargin - diff}px`;
-  if (truncate.style.marginLeft !== targetMargin) {
-    truncate.style.setProperty('margin-left', targetMargin, 'important');
-  }
-}
-
 /*
- * The same alignment for a whole list of headings, with every measurement taken
- * together. Reading a rect after a style write makes the browser lay the page
- * out there and then, so heading-by-heading this cost one layout of the sidebar
- * per heading, on every frame of a scroll; batched it costs one in total. There
- * is deliberately no single-heading version to reach for.
+ * Every heading in the batch goes through the same pass, so the list stays
+ * consistent from one project to the next.
+ *
+ * There used to be a second half here: measure each title, measure a reference
+ * edge, and write the difference back as a `margin-left`. It is gone on purpose,
+ * because the two things it compared do not hold still. The reference was the
+ * first conversation row's text edge, and rows exist only inside an expanded
+ * project — so with one project open the reference sat at 18px and the expanded
+ * project's title was shoved 4px right onto it, while every collapsed project
+ * stayed at 14px. Toggling a heading changed which of those it was, a frame
+ * after the fact and behind a 500ms cache of the previous answer, which is the
+ * left/right drift and the misaligned first project. A fixed edge cannot do any
+ * of that, so the alignment is now one number in one place.
  */
 function alignSubheadings(buttons) {
-  const pending = [];
-  for (const btn of buttons) {
-    const truncate = normaliseSubheading(btn);
-    if (truncate) pending.push({ btn, truncate, left: 0, width: 0 });
-  }
-  if (pending.length === 0) return;
-
-  const first = pending[0].btn;
-  const sidebar = first.closest('[role="navigation"][aria-label="Sidebar"]') || document.querySelector('[role="navigation"][aria-label="Sidebar"]');
-  const targetLeft = getReferenceLeft(sidebar);
-  for (const item of pending) {
-    const rect = item.truncate.getBoundingClientRect();
-    item.left = rect.left;
-    item.width = rect.width;
-  }
-  for (const item of pending) {
-    if (item.width > 0) applySubheadingOffset(item.truncate, item.left, targetLeft);
-  }
+  for (const btn of buttons) normaliseSubheading(btn);
 }
 
 function findHeaderRow(btn) {
@@ -7031,12 +7059,15 @@ function updateAllUserCards(profile) {
     if (imgEl) {
       if (profile.pictureUrl) {
         imgEl.src = profile.pictureUrl;
-        imgEl.style.display = "";
-        if (fallbackEl) fallbackEl.style.display = "none";
-      } else {
-        imgEl.style.display = "none";
-        if (fallbackEl) fallbackEl.style.display = "flex";
       }
+      // Which layer is painted is the pill's `data-avatar`, not an inline
+      // `display`: the stylesheet shows the image with `!important`, so an
+      // inline `display: none` on it never took effect and both layers stayed
+      // in the layout. The inline values are kept only as a fallback for a
+      // stylesheet that predates the attribute.
+      pill.dataset.avatar = profile.pictureUrl ? "image" : "initial";
+      if (imgEl) imgEl.style.display = profile.pictureUrl ? "" : "none";
+      if (fallbackEl) fallbackEl.style.display = profile.pictureUrl ? "none" : "flex";
     }
     if (fallbackEl) {
       const initial = (profile.fullName || profile.email || "A").charAt(0).toUpperCase();
@@ -7072,6 +7103,201 @@ if (plugin.account) {
     // runtime broken enough that no name is ever coming.
     .catch(() => {});
 }
+
+/* ---------------------------------------------------------------------------
+ * The signed-in profile, taken from the application's own tree
+ *
+ * `plugin.account` is the runtime's answer, and it reads the Chromium profile
+ * Antigravity signs into Google through (`Preferences` -> `account_info`). On a
+ * machine where Chromium never wrote that record — no `account_info`, no
+ * `google_accounts.json` — the call answers `{}`, and the card falls back to its
+ * initial and the word "Account". The user's own account settings show a name
+ * and an address at the same time, so the application is asked instead.
+ *
+ * Antigravity's renderer holds it in `exa.codeium_common_pb.UserStatus`: `name`,
+ * `email`, `profilePictureUrl`. That message is what the account row in Settings
+ * is rendered from, so reading it is what makes the card agree with Settings
+ * rather than merely look plausible. Its `profilePictureUrl` is a `data:` URI,
+ * so the picture needs no network and can be kept between launches.
+ *
+ * There is no public API for it, so it is read out of React's own tree — the
+ * message sits in the props of a component near the root, and fibers are
+ * reachable from any element React has rendered. The walk is bounded, runs a
+ * handful of times at startup, and gives up quietly: a tree without the message
+ * leaves the card exactly as the runtime left it.
+ * ------------------------------------------------------------------------- */
+const ACCOUNT_CACHE_KEY = "bettergravity-account";
+const PROFILE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** React's own handle on an element, whatever it calls it in this version. */
+function fiberOf(element) {
+  if (!element) return null;
+  for (const key of Object.keys(element)) {
+    if (key.startsWith("__reactFiber$") || key.startsWith("__reactInternalInstance$")) {
+      return element[key];
+    }
+  }
+  return null;
+}
+
+/** The top of the tree, from whichever handle is available. */
+function reactTreeRoot() {
+  for (const element of [document.body, document.body?.firstElementChild]) {
+    if (!element) continue;
+    for (const key of Object.keys(element)) {
+      if (key.startsWith("__reactContainer$")) return element[key];
+    }
+  }
+  // A rendered element is enough to reach the tree, and the sidebar's settings
+  // button is one that is always there.
+  const seed = fiberOf(document.querySelector(`${SIDEBAR_NAV} [data-testid="settings-button"]`)) || fiberOf(document.body?.firstElementChild);
+  if (!seed) return null;
+  let node = seed;
+  while (node.return) node = node.return;
+  return node;
+}
+
+/**
+ * True for the account message and false for everything else that carries an
+ * address — a `mailto:` prop, a collaborator, an autofill value. The name is
+ * required as well as the address because that pair is what the card needs.
+ */
+function looksLikeAccount(value) {
+  if (!value || typeof value !== "object") return false;
+  if (typeof Node === "function" && value instanceof Node) return false;
+  if (typeof value.email !== "string" || !PROFILE_EMAIL.test(value.email.trim())) return false;
+  return typeof value.name === "string" && value.name.trim() !== "";
+}
+
+/**
+ * A breadth-first walk of React's fibers, looking at the props of each one.
+ *
+ * Breadth-first because the message sits near the root, so the usual case ends
+ * after a hundred or so nodes; the budget only bounds the failure case. Props
+ * are also checked one level down, for the components that hand the account on
+ * as a field of something else.
+ */
+function findAccountInReactTree(budget = 20000) {
+  const root = reactTreeRoot();
+  if (!root) return null;
+
+  const queue = [root];
+  const seen = new Set();
+  let visited = 0;
+
+  while (queue.length > 0 && visited < budget) {
+    const fiber = queue.shift();
+    if (!fiber || seen.has(fiber)) continue;
+    seen.add(fiber);
+    visited += 1;
+
+    const props = fiber.memoizedProps || fiber.pendingProps;
+    if (props && typeof props === "object") {
+      if (looksLikeAccount(props.userStatus)) return props.userStatus;
+      for (const key of Object.keys(props)) {
+        const value = props[key];
+        if (looksLikeAccount(value)) return value;
+        if (value && typeof value === "object" && !Array.isArray(value) && looksLikeAccount(value.userStatus)) {
+          return value.userStatus;
+        }
+      }
+    }
+
+    if (fiber.child) queue.push(fiber.child);
+    if (fiber.sibling) queue.push(fiber.sibling);
+  }
+
+  return null;
+}
+
+function readCachedAccount() {
+  try {
+    const raw = localStorage.getItem(ACCOUNT_CACHE_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw);
+    return value && typeof value === "object" ? value : null;
+  } catch {
+    // Unreadable cache is the same as no cache: the tree is read again below.
+    return null;
+  }
+}
+
+function writeCachedAccount(profile) {
+  try {
+    localStorage.setItem(ACCOUNT_CACHE_KEY, JSON.stringify(profile));
+  } catch {
+    // Quota, or a picture too large to keep. Nothing depends on this landing.
+  }
+}
+
+/**
+ * Copies the fields the card shows, under either naming.
+ *
+ * `force` is for the application's own answer, which is the one Settings is
+ * rendered from: it takes precedence over a value the runtime supplied, and what
+ * it says is what gets cached. A field it does not carry is left alone.
+ */
+function mergeAccountProfile(profile, { force = false } = {}) {
+  if (!profile) return false;
+
+  let changed = false;
+  const take = (key, value) => {
+    if (typeof value !== "string" || value.trim() === "") return;
+    if (!force && userAccountProfile[key]) return;
+    if (userAccountProfile[key] === value) return;
+    userAccountProfile[key] = value;
+    changed = true;
+  };
+
+  take("fullName", profile.fullName ?? profile.name);
+  take("email", profile.email);
+  take("pictureUrl", profile.pictureUrl ?? profile.profilePictureUrl);
+
+  return changed;
+}
+
+/*
+ * Walking the tree costs a layout-free pass over a few hundred objects, so it is
+ * cheap — but it is also useless until the application has signed in and put the
+ * message there, which is after this script runs. The delays are the retries
+ * that cover that window; the ladder ends because a tree that never has it is
+ * one the card has to live without.
+ */
+const ACCOUNT_SYNC_DELAYS = [0, 400, 1200, 3000, 7000, 15000, 30000];
+let accountSyncTimer = null;
+let accountSyncAttempts = 0;
+
+function syncAccountFromApp() {
+  const status = findAccountInReactTree();
+  if (!status) return false;
+
+  // The cache is only rewritten when something actually changed, so a settled
+  // profile stops touching storage on every launch.
+  if (mergeAccountProfile(status, { force: true })) {
+    updateAllUserCards(userAccountProfile);
+    writeCachedAccount(userAccountProfile);
+  }
+  return true;
+}
+
+function scheduleAccountSync() {
+  if (accountSyncAttempts >= ACCOUNT_SYNC_DELAYS.length) return;
+  const delay = ACCOUNT_SYNC_DELAYS[accountSyncAttempts];
+  accountSyncAttempts += 1;
+
+  if (accountSyncTimer !== null) clearTimeout(accountSyncTimer);
+  accountSyncTimer = setTimeout(() => {
+    accountSyncTimer = null;
+    // Nothing left to learn once both halves of the card are known.
+    if (userAccountProfile.email && userAccountProfile.pictureUrl) return;
+    if (!syncAccountFromApp()) scheduleAccountSync();
+  }, delay);
+}
+
+// What the last launch settled on paints first, so the card is right before the
+// application has finished starting. The tree then has the last word.
+mergeAccountProfile(readCachedAccount());
+scheduleAccountSync();
 
 /**
  * `Hello there, <name>` above the composer, as Willow's `PinnedChatGreeting`.
@@ -7735,7 +7961,12 @@ function ensureSidebarUserCard(footer) {
     img.addEventListener("error", () => {
       img.style.display = "none";
       fallback.style.display = "flex";
+      pill.dataset.avatar = "initial";
     });
+
+    // Painted before the picture is known: the initial is what shows until a
+    // profile with a picture arrives.
+    pill.dataset.avatar = avatarUrl ? "image" : "initial";
 
     avatarWrap.appendChild(img);
     avatarWrap.appendChild(fallback);
