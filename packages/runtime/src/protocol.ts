@@ -50,6 +50,7 @@ export const CHANNEL = {
   overlayMessage: "bettergravity:overlay-message",
   overlaySurface: "bettergravity:overlay-surface",
   overlayAttached: "bettergravity:overlay-attached",
+  titleBarOverlay: "bettergravity:title-bar-overlay",
   log: "bettergravity:log"
 } as const;
 

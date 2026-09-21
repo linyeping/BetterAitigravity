@@ -16,6 +16,7 @@ import {
 } from "../protocol.js";
 import { BRIDGE_GLOBAL, type RuntimeBridge } from "../world/bridge.js";
 import { applyThemes } from "./themes.js";
+import { syncTitleBarOverlay } from "./titlebar.js";
 import { attachOverlaySurface } from "./overlay.js";
 
 /** The bundled page-world runtime, inlined at build time by build.mjs. */
@@ -175,6 +176,7 @@ async function applyThemesWhenReady(): Promise<void> {
 
   document.documentElement.setAttribute("data-bettergravity", state.version);
   applyThemes(state.themes);
+  syncTitleBarOverlay(state.themes);
   for (const diagnostic of state.diagnostics) report(`diagnostic — ${diagnostic.source}: ${diagnostic.message}`);
 }
 
@@ -188,6 +190,7 @@ if (isOverlayWindow) {
   }
   ipcRenderer.on(CHANNEL.stateChanged, (_event, state: RuntimeState) => {
     applyThemes(state.themes);
+    syncTitleBarOverlay(state.themes);
     for (const listener of stateListeners) {
       try {
         listener(state);

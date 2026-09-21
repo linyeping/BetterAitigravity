@@ -145,6 +145,29 @@ function registerOverlayChannels(overlay: OverlayWindow): void {
   });
 }
 
+/**
+ * The window controls overlay sits above the page and is drawn by the host, so
+ * CSS cannot reach it. The host picks its colour from its own theme mode, which
+ * leaves a light theme under a dark strip; the preload resolves the theme's real
+ * colours and forwards them here. Windows created without an overlay reject the
+ * call, and the runtime opens windows of its own, so each is tried separately.
+ */
+function registerTitleBarChannel(): void {
+  ipcMain.handle(CHANNEL.titleBarOverlay, (_event, color: string, symbolColor: string) => {
+    let applied = 0;
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (window.webContents.isDestroyed()) continue;
+      try {
+        window.setTitleBarOverlay({ color, symbolColor });
+        applied += 1;
+      } catch {
+        // No title bar overlay on this window; there is nothing to recolour.
+      }
+    }
+    return applied;
+  });
+}
+
 function registerGeminiChannels(gemini: GeminiTranslator): void {
   gemini.onStatusChanged((status: GeminiStatus) => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -318,6 +341,7 @@ export function activate(context: RuntimeContext): void {
   registerBrowserChannels(browser);
   registerPresenceChannels(presence);
   registerOverlayChannels(overlay);
+  registerTitleBarChannel();
   registerGeminiChannels(gemini);
 
   // Armed here rather than after app.whenReady() because Antigravity spawns its
