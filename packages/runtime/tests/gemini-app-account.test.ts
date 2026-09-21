@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
- * The account card has two ways to be wrong that a cold start exposes, and both
- * were real on the running window:
+ * The account card has three ways to be wrong that the running window exposed,
+ * and all three were real:
  *
  * 1. Antigravity serves its window from a fresh loopback port every launch, so
  *    `localStorage` (origin-scoped) never survives a restart. The cookie is the
@@ -14,6 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *    signed-in shell inside the same document. A plugin that only retries on a
  *    fixed ladder spends every attempt on the login screen and gives up before
  *    the account exists.
+ * 3. A card that is complete is not a card that is finished. Signing out and
+ *    back in as somebody else changes the account under a card that already
+ *    looked right, and a watcher that stops once the profile is complete never
+ *    notices.
  */
 
 const source = readFileSync("community/plugins/gemini-app/index.js", "utf8");
@@ -80,6 +84,29 @@ function fiberTreeWithAccount(status: Record<string, string>) {
   return { memoizedProps: {}, child: leaf, sibling: null, return: null };
 }
 
+/** Puts the account the app publishes to its own components, as sign-in does. */
+function publishAccount(root: HTMLElement, status: Record<string, string>) {
+  (root as unknown as Record<string, unknown>)["__reactContainer$test"] = fiberTreeWithAccount(status);
+}
+
+/** Any re-render is a body mutation, which is what the watcher listens for. */
+function nudgeBody() {
+  const marker = document.createElement("span");
+  document.body.appendChild(marker);
+  marker.remove();
+}
+
+const FIRST_ACCOUNT = {
+  name: "景天",
+  email: "17309497084jt@gmail.com",
+  profilePictureUrl: "data:image/png;base64,AAAA",
+};
+const SECOND_ACCOUNT = {
+  name: "林业平",
+  email: "yepinglin20@gmail.com",
+  profilePictureUrl: "data:image/png;base64,BBBB",
+};
+
 function readCard() {
   const pill = document.getElementById("gemini-sidebar-user-pill");
   if (!pill) return null;
@@ -138,11 +165,7 @@ describe("gemini-app account card", () => {
 
     // Sign-in finishes: the account lands in the tree and the shell renders, in
     // the same document, with no second injection.
-    (root as unknown as Record<string, unknown>)["__reactContainer$test"] = fiberTreeWithAccount({
-      name: "景天",
-      email: "17309497084jt@gmail.com",
-      profilePictureUrl: "data:image/png;base64,AAAA",
-    });
+    publishAccount(root, FIRST_ACCOUNT);
     renderSignedInShell();
     announceShell();
 
@@ -153,5 +176,56 @@ describe("gemini-app account card", () => {
 
     expect(readCard()).toEqual({ name: "景天", email: "17309497084jt@gmail.com", avatar: "image" });
     expect(localStorage.getItem(ACCOUNT_COOKIE_KEY)).toContain("17309497084jt@gmail.com");
+  });
+
+  it("follows the account when a different one signs in", async () => {
+    const root = document.createElement("div");
+    root.id = "root";
+    document.body.appendChild(root);
+
+    publishAccount(root, FIRST_ACCOUNT);
+    renderSignedInShell();
+    startPlugin();
+    await settle();
+    announceShell();
+    vi.advanceTimersByTime(1000);
+    await settle();
+    expect(readCard()).toEqual({ name: "景天", email: "17309497084jt@gmail.com", avatar: "image" });
+
+    // The card is complete now, which is exactly the state that used to stop the
+    // watching. The first account signs out and a second one signs in.
+    publishAccount(root, SECOND_ACCOUNT);
+    nudgeBody();
+    vi.advanceTimersByTime(2500);
+    await settle();
+
+    expect(readCard()).toEqual({ name: "林业平", email: "yepinglin20@gmail.com", avatar: "image" });
+    expect(localStorage.getItem(ACCOUNT_COOKIE_KEY)).toContain("yepinglin20@gmail.com");
+    expect(document.cookie).toContain(encodeURIComponent("yepinglin20@gmail.com"));
+  });
+
+  it("drops the previous account's photo when the new one has none", async () => {
+    const root = document.createElement("div");
+    root.id = "root";
+    document.body.appendChild(root);
+
+    publishAccount(root, FIRST_ACCOUNT);
+    renderSignedInShell();
+    startPlugin();
+    await settle();
+    announceShell();
+    vi.advanceTimersByTime(1000);
+    await settle();
+    expect(readCard()?.avatar).toBe("image");
+
+    // A merge would keep the first account's photo here, because a field the new
+    // account does not carry is left alone. A different address is a different
+    // person, so nothing of the old one may survive it.
+    publishAccount(root, { name: "林业平", email: "yepinglin20@gmail.com" });
+    nudgeBody();
+    vi.advanceTimersByTime(2500);
+    await settle();
+
+    expect(readCard()).toEqual({ name: "林业平", email: "yepinglin20@gmail.com", avatar: "initial" });
   });
 });

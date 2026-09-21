@@ -7274,16 +7274,32 @@ function readAccountCookie() {
  * `force` is for the application's own answer, which is the one Settings is
  * rendered from: it takes precedence over a value the runtime supplied, and what
  * it says is what gets cached. A field it does not carry is left alone.
+ *
+ * A different address is a different person, and that case is not a merge. The
+ * account under the card can change — signing out and back in as someone else is
+ * a supported thing to do — and when it does, everything the previous account put
+ * there has to go before the new one is read. Merging instead would keep the old
+ * name and photo whenever the new account arrives without them, so a switch to a
+ * photo-less account would look like no switch at all.
  */
 function mergeAccountProfile(profile, { force = false } = {}) {
   if (!profile) return false;
 
+  const incomingEmail = typeof profile.email === "string" ? profile.email.trim() : "";
+  if (force && incomingEmail && userAccountProfile.email && incomingEmail !== userAccountProfile.email) {
+    userAccountProfile = { ...DEFAULT_ACCOUNT };
+  }
+
   let changed = false;
   const take = (key, value) => {
-    if (typeof value !== "string" || value.trim() === "") return;
+    if (typeof value !== "string") return;
+    // Stored trimmed, and compared the same way, so a value the application pads
+    // cannot read as a change on every sync and rewrite storage forever.
+    const text = value.trim();
+    if (text === "") return;
     if (!force && userAccountProfile[key]) return;
-    if (userAccountProfile[key] === value) return;
-    userAccountProfile[key] = value;
+    if (userAccountProfile[key] === text) return;
+    userAccountProfile[key] = text;
     changed = true;
   };
 
@@ -7299,29 +7315,49 @@ function mergeAccountProfile(profile, { force = false } = {}) {
  * cheap — but it is also useless until the application has signed in and put the
  * message there, which is after this script runs.
  *
- * The ladder alone used to be the whole answer, and it could not be. Antigravity
- * boots onto `/onboarding?login=true`, with no sidebar and no `userStatus`, and
- * sign-in can take minutes; the signed-in shell then replaces that screen inside
- * the same document, so this script is never injected again and never gets a
- * second ladder. Measured: the ladder ran out roughly 56s after launch with the
- * window still on `/onboarding`, while the tree held a matchable `userStatus`
- * minutes later, by which point nothing was listening. The card stayed on
- * "Account" until the next restart, which re-ran the same trap.
+ * The ladder alone was the first attempt at covering that wait, and it could not
+ * work. Antigravity boots onto `/onboarding?login=true`, with no sidebar and no
+ * `userStatus`, and sign-in can take minutes; the signed-in shell then replaces
+ * that screen inside the same document, so this script is never injected again
+ * and never gets a second ladder. Measured: the ladder ran out roughly 56s after
+ * launch with the window still on `/onboarding`, while the tree held a matchable
+ * `userStatus` minutes later, by which point nothing was listening.
  *
- * So the ladder is kept for the case where the message is already there, but it
- * no longer ends: after the last rung it settles into a slow keepalive, and
- * startAccountWatching supplies the event that actually matters, which is the
- * signed-in shell rendering.
+ * The second attempt kept a watcher, but took it down once the card was complete
+ * - "complete" read as "final", which is what a card for a signed-in user looks
+ * like. It is not final. Signing out and back in as somebody else is a supported
+ * thing to do, and it left the card showing the account that had just been left
+ * behind, indefinitely, because nothing was reading the tree any more. Measured
+ * on a window that had switched accounts: the tree held the new address on five
+ * fibers while the card, the cache and the cookie all held the old one.
+ *
+ * So nothing here ends. The ladder covers a cold start, its tail is a keepalive,
+ * and startAccountWatching stays connected for the life of the plugin, supplying
+ * the event that matters, which is the shell re-rendering. The walk is cheap
+ * enough to keep running: 3444 fibers in ~3ms when there is no account to find,
+ * and ~0.1ms in the usual case, where the message sits near the root and the
+ * search ends early.
  */
 const ACCOUNT_SYNC_DELAYS = [0, 400, 1200, 3000, 7000, 15000, 30000];
 const ACCOUNT_SYNC_KEEPALIVE_MS = 30_000;
+/*
+ * The body mutates constantly, so attempts are coalesced. A card still waiting
+ * for sign-in uses the short interval; a complete one is only being watched for
+ * a switch, which can afford to be noticed a second or two late.
+ */
+const ACCOUNT_WATCH_DEBOUNCE_MS = 600;
+const ACCOUNT_WATCH_IDLE_MS = 2000;
 let accountSyncTimer = null;
 let accountSyncAttempts = 0;
 let accountWatchObserver = null;
 let accountWatchTimer = null;
 
-/** Both halves of the card known: nothing left to learn. */
-function accountProfileSettled() {
+/**
+ * Both halves of the card known. This no longer means "finished" - it only picks
+ * the interval, because the account can be switched under a card that already
+ * looks right.
+ */
+function accountProfileComplete() {
   return !!(userAccountProfile.email && userAccountProfile.pictureUrl);
 }
 
@@ -7343,37 +7379,36 @@ function stopAccountWatching() {
 /*
  * The signed-in shell arriving is the signal worth reacting to, and the body's
  * child list is where it shows up. React re-renders constantly, so attempts are
- * coalesced to one per 600ms; each is a ~1ms walk, and the watcher takes itself
- * down as soon as the profile is complete.
+ * coalesced; each is a sub-millisecond walk in the usual case. Unlike before,
+ * the watcher is never taken down on its own - it is disconnected only when the
+ * plugin is disposed, because a complete card is not a finished one.
  */
 function startAccountWatching() {
-  if (accountWatchObserver || accountProfileSettled() || !document.body) return;
+  if (accountWatchObserver || !document.body) return;
   accountWatchObserver = new MutationObserver(() => {
     if (accountWatchTimer !== null) return;
     accountWatchTimer = setTimeout(() => {
       accountWatchTimer = null;
-      if (accountProfileSettled()) {
-        stopAccountWatching();
-        return;
-      }
       syncAccountFromApp();
-    }, 600);
+    }, accountProfileComplete() ? ACCOUNT_WATCH_IDLE_MS : ACCOUNT_WATCH_DEBOUNCE_MS);
   });
   accountWatchObserver.observe(document.body, { childList: true, subtree: true });
   remember(document.body, accountWatchObserver);
 }
 
 function syncAccountFromApp() {
+  // First match wins, and the subtree that carries the account is the same one
+  // that re-renders when it changes. Measured mid-switch: five fibers carried a
+  // `userStatus`, all of them the new account, and none the old one.
   const status = findAccountInReactTree();
   if (!status) return false;
 
-  // The cache is only rewritten when something actually changed, so a settled
-  // profile stops touching storage on every launch.
+  // The cache is only rewritten when something actually changed, so a card with
+  // nothing new to show stops touching storage.
   if (mergeAccountProfile(status, { force: true })) {
     updateAllUserCards(userAccountProfile);
     writeCachedAccount(userAccountProfile);
   }
-  if (accountProfileSettled()) stopAccountWatching();
   return true;
 }
 
@@ -7387,18 +7422,18 @@ function scheduleAccountSync() {
   if (accountSyncTimer !== null) clearTimeout(accountSyncTimer);
   accountSyncTimer = setTimeout(() => {
     accountSyncTimer = null;
-    // Nothing left to learn once both halves of the card are known.
-    if (accountProfileSettled()) return;
     syncAccountFromApp();
     scheduleAccountSync();
   }, delay);
 }
 
 // What the last launch settled on paints first, so the card is right before the
-// application has finished starting. The tree then has the last word.
+// application has finished starting. The tree then has the last word, and keeps
+// having it for as long as the plugin lives.
 mergeAccountProfile(readCachedAccount() || readAccountCookie());
 scheduleAccountSync();
 startAccountWatching();
+plugin.onDispose(() => stopAccountWatching());
 
 /**
  * `Hello there, <name>` above the composer, as Willow's `PinnedChatGreeting`.
