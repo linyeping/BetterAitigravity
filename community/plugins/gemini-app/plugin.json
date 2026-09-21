@@ -1,7 +1,7 @@
 {
   "name": "Gemini App",
   "description": "Antigravity restyled after the Gemini app: the left sidebar, the model selector, the prompt box, and the conversation, with short model names on the prompt box pill and the agent's tools in the plus menu.",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "author": "Yashjit Pal",
   "main": "index.js",
   "styles": "styles/gemini-app.css",

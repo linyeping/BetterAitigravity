@@ -7228,6 +7228,44 @@ function writeCachedAccount(profile) {
   } catch {
     // Quota, or a picture too large to keep. Nothing depends on this landing.
   }
+  writeAccountCookie(profile);
+}
+
+/*
+ * `localStorage` is scoped to an origin, and Antigravity serves its window from
+ * a fresh loopback port on every launch (`https://127.0.0.1:9603` today, `:5404`
+ * earlier, `:5401` before that). The profile kept there is therefore gone after
+ * every restart, and the card has nothing to paint until the tree answers — which
+ * it cannot do while the window is still on `/onboarding`.
+ *
+ * Cookies are scoped to the host and ignore the port, so a name and address kept
+ * there outlive the restart. The picture is deliberately left out: it is a ~11KB
+ * `data:` URI and the per-cookie budget is 4KB. A card that starts with the right
+ * name and address and picks up the photo a moment later beats one that shows
+ * "Account" until sign-in finishes.
+ */
+const ACCOUNT_COOKIE_KEY = "bettergravity-account";
+
+function writeAccountCookie(profile) {
+  try {
+    const value = encodeURIComponent(JSON.stringify({ fullName: profile.fullName, email: profile.email }));
+    document.cookie = `${ACCOUNT_COOKIE_KEY}=${value}; path=/; max-age=31536000; SameSite=Lax`;
+  } catch {
+    // Cookies disabled, or a value the browser would not take. This is a
+    // shortcut for the first frame, never the source of truth.
+  }
+}
+
+function readAccountCookie() {
+  try {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${ACCOUNT_COOKIE_KEY}=([^;]*)`));
+    if (!match) return null;
+    const value = JSON.parse(decodeURIComponent(match[1]));
+    return value && typeof value === "object" ? value : null;
+  } catch {
+    // An unreadable cookie is the same as none: the tree is read below.
+    return null;
+  }
 }
 
 /**
@@ -7259,13 +7297,71 @@ function mergeAccountProfile(profile, { force = false } = {}) {
 /*
  * Walking the tree costs a layout-free pass over a few hundred objects, so it is
  * cheap — but it is also useless until the application has signed in and put the
- * message there, which is after this script runs. The delays are the retries
- * that cover that window; the ladder ends because a tree that never has it is
- * one the card has to live without.
+ * message there, which is after this script runs.
+ *
+ * The ladder alone used to be the whole answer, and it could not be. Antigravity
+ * boots onto `/onboarding?login=true`, with no sidebar and no `userStatus`, and
+ * sign-in can take minutes; the signed-in shell then replaces that screen inside
+ * the same document, so this script is never injected again and never gets a
+ * second ladder. Measured: the ladder ran out roughly 56s after launch with the
+ * window still on `/onboarding`, while the tree held a matchable `userStatus`
+ * minutes later, by which point nothing was listening. The card stayed on
+ * "Account" until the next restart, which re-ran the same trap.
+ *
+ * So the ladder is kept for the case where the message is already there, but it
+ * no longer ends: after the last rung it settles into a slow keepalive, and
+ * startAccountWatching supplies the event that actually matters, which is the
+ * signed-in shell rendering.
  */
 const ACCOUNT_SYNC_DELAYS = [0, 400, 1200, 3000, 7000, 15000, 30000];
+const ACCOUNT_SYNC_KEEPALIVE_MS = 30_000;
 let accountSyncTimer = null;
 let accountSyncAttempts = 0;
+let accountWatchObserver = null;
+let accountWatchTimer = null;
+
+/** Both halves of the card known: nothing left to learn. */
+function accountProfileSettled() {
+  return !!(userAccountProfile.email && userAccountProfile.pictureUrl);
+}
+
+function stopAccountWatching() {
+  if (accountSyncTimer !== null) {
+    clearTimeout(accountSyncTimer);
+    accountSyncTimer = null;
+  }
+  if (accountWatchTimer !== null) {
+    clearTimeout(accountWatchTimer);
+    accountWatchTimer = null;
+  }
+  if (accountWatchObserver) {
+    accountWatchObserver.disconnect();
+    accountWatchObserver = null;
+  }
+}
+
+/*
+ * The signed-in shell arriving is the signal worth reacting to, and the body's
+ * child list is where it shows up. React re-renders constantly, so attempts are
+ * coalesced to one per 600ms; each is a ~1ms walk, and the watcher takes itself
+ * down as soon as the profile is complete.
+ */
+function startAccountWatching() {
+  if (accountWatchObserver || accountProfileSettled() || !document.body) return;
+  accountWatchObserver = new MutationObserver(() => {
+    if (accountWatchTimer !== null) return;
+    accountWatchTimer = setTimeout(() => {
+      accountWatchTimer = null;
+      if (accountProfileSettled()) {
+        stopAccountWatching();
+        return;
+      }
+      syncAccountFromApp();
+    }, 600);
+  });
+  accountWatchObserver.observe(document.body, { childList: true, subtree: true });
+  remember(document.body, accountWatchObserver);
+}
 
 function syncAccountFromApp() {
   const status = findAccountInReactTree();
@@ -7277,27 +7373,32 @@ function syncAccountFromApp() {
     updateAllUserCards(userAccountProfile);
     writeCachedAccount(userAccountProfile);
   }
+  if (accountProfileSettled()) stopAccountWatching();
   return true;
 }
 
 function scheduleAccountSync() {
-  if (accountSyncAttempts >= ACCOUNT_SYNC_DELAYS.length) return;
-  const delay = ACCOUNT_SYNC_DELAYS[accountSyncAttempts];
+  const delay =
+    accountSyncAttempts < ACCOUNT_SYNC_DELAYS.length
+      ? ACCOUNT_SYNC_DELAYS[accountSyncAttempts]
+      : ACCOUNT_SYNC_KEEPALIVE_MS;
   accountSyncAttempts += 1;
 
   if (accountSyncTimer !== null) clearTimeout(accountSyncTimer);
   accountSyncTimer = setTimeout(() => {
     accountSyncTimer = null;
     // Nothing left to learn once both halves of the card are known.
-    if (userAccountProfile.email && userAccountProfile.pictureUrl) return;
-    if (!syncAccountFromApp()) scheduleAccountSync();
+    if (accountProfileSettled()) return;
+    syncAccountFromApp();
+    scheduleAccountSync();
   }, delay);
 }
 
 // What the last launch settled on paints first, so the card is right before the
 // application has finished starting. The tree then has the last word.
-mergeAccountProfile(readCachedAccount());
+mergeAccountProfile(readCachedAccount() || readAccountCookie());
 scheduleAccountSync();
+startAccountWatching();
 
 /**
  * `Hello there, <name>` above the composer, as Willow's `PinnedChatGreeting`.

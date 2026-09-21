@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-21T04:40:34.487Z",
+  "generatedAt": "2026-09-21T06:48:07.992Z",
   "entries": [
     {
       "id": "compact",
@@ -340,11 +340,11 @@
       "kind": "plugin",
       "name": "Gemini App",
       "description": "Antigravity restyled after the Gemini app: the left sidebar, the model selector, the prompt box, and the conversation, with short model names on the prompt box pill and the agent's tools in the plus menu.",
-      "version": "0.5.4",
+      "version": "0.5.5",
       "author": "Yashjit Pal",
       "source": "https://github.com/YashjitPal/BetterGravity",
       "path": "community/plugins/gemini-app",
-      "bytes": 966685,
+      "bytes": 970665,
       "files": [
         {
           "name": "assets/antigravity-mark.png",
@@ -363,13 +363,13 @@
         },
         {
           "name": "index.js",
-          "bytes": 398219,
-          "sha256": "f52db78ee0fca827a1f6224eb61bd42af6d1ffa83a84952efdc2037dc32798b2"
+          "bytes": 402199,
+          "sha256": "9f960a1b6b8c389a1f591f979530df92192f989a21c87bc822ae21e58a5881a6"
         },
         {
           "name": "plugin.json",
           "bytes": 30072,
-          "sha256": "6db9c37b96073be941bccd89fd6c2fa5a25744957def6c2de17fef52e9a5aa42"
+          "sha256": "3c9c1c6c9d1644580bdd93ec7fa37ed9dc9d6e419db2c1fdca26e90f445197ca"
         },
         {
           "name": "styles/conversation.css",
