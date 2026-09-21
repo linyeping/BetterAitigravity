@@ -154,21 +154,37 @@ function reviewRemoteReferences(css: string, findings: Finding[], where = ""): v
 
 interface ThemeIdentity {
   readonly name: string;
-  readonly description: string;
-  readonly author: string;
-  readonly version: string;
+  readonly description?: string;
+  readonly version?: string;
+  readonly author?: string;
   readonly source?: string;
+}
+
+/** Reads a present-but-blank field as absent, so an empty annotation is skipped rather than serialised. */
+function optionalText(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.trim().length === 0) return undefined;
+  return value.trim();
 }
 
 function requireThemeMetadata(css: string, findings: Finding[]): ThemeIdentity {
   const metadata = parseThemeMetadata(css);
   const name = requireText(metadata.name, "@name", findings);
-  const description = requireText(metadata.description, "@description", findings);
-  const author = requireText(metadata.author, "@author", findings);
-  const version = requireText(metadata.version, "@version", findings);
+  // Only the name is required. A theme is its palette; the rest is provenance a
+  // submission may carry for the catalogue, not a form it has to fill in — the
+  // settings list shows the name and the switch and nothing else.
+  const description = optionalText(metadata.description);
+  const version = optionalText(metadata.version);
+  const author = optionalText(metadata.author);
+  const source = optionalText(metadata.source);
   // Key order is the catalog's serialised order, which `check` compares byte
   // for byte, so it has to stay what it has always been.
-  return { name, description, version, author, ...(metadata.source ? { source: metadata.source } : {}) };
+  return {
+    name,
+    ...(description !== undefined ? { description } : {}),
+    ...(version !== undefined ? { version } : {}),
+    ...(author !== undefined ? { author } : {}),
+    ...(source !== undefined ? { source } : {})
+  };
 }
 
 export function validateTheme(fileName: string, css: string): ValidationResult {

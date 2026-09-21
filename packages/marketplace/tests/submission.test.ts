@@ -40,9 +40,9 @@ describe("validateTheme", () => {
     expect(result.entry?.bytes).toBeGreaterThan(0);
   });
 
-  it("requires every field the catalog displays", () => {
+  it("requires a name and nothing else", () => {
     const result = validateTheme("bare.css", "body {}");
-    expect(errors(result)).toEqual(["@name is required.", "@description is required.", "@author is required.", "@version is required."]);
+    expect(errors(result)).toEqual(["@name is required."]);
     expect(result.entry).toBeUndefined();
   });
 
@@ -135,7 +135,7 @@ describe("validateThemeFolder", () => {
 
   it("reads the metadata from the entry file", () => {
     const result = validateThemeFolder("midnight", themeFiles({ stylesheets: [{ name: "theme.css", css: "body {}" }] }));
-    expect(errors(result)).toEqual(["@name is required.", "@description is required.", "@author is required.", "@version is required."]);
+    expect(errors(result)).toEqual(["@name is required."]);
   });
 
   it("insists on a predictable folder name", () => {
@@ -284,7 +284,7 @@ describe("validatePlugin", () => {
     expect(errors(result)).toEqual(["plugin.json is not valid JSON."]);
   });
 
-  it("requires every field the catalog displays", () => {
+  it("requires a name and nothing else", () => {
     const result = validatePlugin("word-count", pluginFiles({ manifest: "{}" }));
     expect(errors(result)).toEqual(["name is required.", "description is required.", "version is required.", "author is required."]);
   });

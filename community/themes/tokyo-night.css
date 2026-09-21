@@ -1,0 +1,425 @@
+/**
+ * @name        Tokyo Night
+ * @source      https://github.com/linyeping/BetterAitigravity
+ *
+ * 宿主把 token 分三层写进页面（内联 style / :root / :root !important），
+ * 所以下面每条声明都带 !important；侧栏那几个 token 是被钉在
+ * [role="navigation"][aria-label="Sidebar"] 上的，只能在那个元素上改。
+ */
+
+/* ---- 1. 语义色板 ---- */
+:root {
+  --background: #1A1B26 !important;
+  --foreground: #A9B1D6 !important;
+  --primary: #3D59A1 !important;
+  --primary-foreground: #FFFFFF !important;
+  --secondary: #16161E !important;
+  --secondary-foreground: #A9B1D6 !important;
+  --muted: #16161E !important;
+  --muted-foreground: #9AA5CE !important;
+  --border: rgba(122, 162, 247, 0.16) !important;
+  --card: #1F2335 !important;
+  --card-border: rgba(122, 162, 247, 0.14) !important;
+  --sidebar: #16161E !important;
+  --sidebar-secondary: #292E42 !important;
+  --sidebar-muted: #1F2335 !important;
+  --placeholder: #6B7394 !important;
+  --link: #7AA2F7 !important;
+  --error: #F7768E !important;
+  --warning: #E0AF68 !important;
+  --success: #9ECE6A !important;
+  --code-foreground: #E0AF68 !important;
+  --content: #1A1B26 !important;
+  --selection-background: rgba(122, 162, 247, 0.30) !important;
+  --focus-ring-color: rgba(122, 162, 247, 0.70) !important;
+  --focus-ring-offset-color: #1A1B26 !important;
+  color-scheme: dark !important;
+}
+
+/* ---- 2. Tailwind 桥接层 ---- */
+:root {
+  --color-background: var(--background) !important;
+  --color-foreground: var(--foreground) !important;
+  --color-primary: var(--primary) !important;
+  --color-primary-foreground: var(--primary-foreground) !important;
+  --color-secondary: var(--secondary) !important;
+  --color-secondary-foreground: var(--secondary-foreground) !important;
+  --color-muted: var(--muted) !important;
+  --color-muted-foreground: var(--muted-foreground) !important;
+  --color-border: var(--border) !important;
+  --color-card: var(--card) !important;
+  --color-card-border: var(--card-border) !important;
+  --color-sidebar: var(--sidebar) !important;
+  --color-sidebar-secondary: var(--sidebar-secondary) !important;
+  --color-sidebar-muted: var(--sidebar-muted) !important;
+  --color-placeholder: var(--placeholder) !important;
+  --color-link: var(--link) !important;
+  --color-error: var(--error) !important;
+  --color-warning: var(--warning) !important;
+  --color-success: var(--success) !important;
+  --color-content: var(--content) !important;
+  --color-code: var(--code-foreground) !important;
+}
+
+/* ---- 2b. 主题私有变量 ----
+ * 3b 节靠这些名字取色。用私有名是为了不依赖 --sidebar 之类 token 的争夺结果：
+ * 插件模板里不会出现 --bg-theme-*，所以它一定是我们写进去的值。 */
+:root {
+  --bg-theme-rail: #16161E !important;
+  --bg-theme-rail-2: #292E42 !important;
+  --bg-theme-fg: #A9B1D6 !important;
+  --bg-theme-fg-muted: #9AA5CE !important;
+  --bg-theme-card: #1F2335 !important;
+}
+
+/* ---- 3. 侧栏 token ----
+ * 宿主与 gemini-app 插件都把 --sidebar 这组钉在 nav 元素上（各一条 (0,2,0) + !important）。
+ * 这里补一个 [class] 到 (0,3,0)，就不用赌谁的样式表挂在后面。 */
+[role="navigation"][aria-label="Sidebar"][class] {
+  --sidebar: #16161E !important;
+  --color-sidebar: #16161E !important;
+  --sidebar-background: #16161E !important;
+  --sidebar-secondary: #292E42 !important;
+  --color-sidebar-secondary: #292E42 !important;
+  --sidebar-muted: #1F2335 !important;
+  --color-sidebar-muted: #1F2335 !important;
+  --sidebar-border: transparent !important;
+}
+
+/* ---- 3b. 让侧栏跟随主题 ----
+ * gemini-app 把侧栏表面写成了字面量（#1f1f1f / #171717 / #333537），
+ * 而它的文字 token（--gemini-text 等）与那些表面是绑定的：只改 token 会
+ * 得到「深底深字」。所以这里按同样的选择器把表面也拉回来。
+ * 颜色一律读 2b 节的 --bg-theme-* 私有变量，不读 --sidebar：
+ * 私有名插件与宿主都不可能定义，取色结果只取决于本文件。
+ * 插件那份最高到 (0,4,1) / (1,3,0)，这里加 body 和 [class] 提到 (0,5,2) / (1,4,2)，
+ * 不依赖样式表先后顺序。删掉整节，侧栏就回到插件写死的 Willow 深色轨道。 */
+
+body [role="navigation"][aria-label="Sidebar"] {
+  background: var(--bg-theme-rail) !important;
+}
+
+body [role="navigation"][aria-label="Sidebar"] .bg-sidebar,
+body [role="navigation"][aria-label="Sidebar"] div[class*="bg-sidebar"],
+body [role="navigation"][aria-label="Sidebar"] button[class*="bg-sidebar"] {
+  background-color: var(--bg-theme-rail) !important;
+}
+
+body [role="navigation"][aria-label="Sidebar"][class] .bg-sidebar-secondary,
+body [role="navigation"][aria-label="Sidebar"][class] [data-bettergravity-active="true"],
+body [role="navigation"][aria-label="Sidebar"][class] [data-testid="new-conversation-button"].bg-sidebar-secondary,
+body [role="navigation"][aria-label="Sidebar"][class] [data-testid="history-button"].bg-sidebar-secondary,
+body [role="navigation"][aria-label="Sidebar"][class] [data-testid="automations-button"].bg-sidebar-secondary,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-skills-button.bg-sidebar-secondary,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scheduled-tasks-button.bg-sidebar-secondary,
+body [role="navigation"][aria-label="Sidebar"][class] div.flex-col > a.bg-sidebar-secondary,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *[aria-pressed="true"],
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *[aria-selected="true"],
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *[data-active="true"],
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *[data-selected="true"],
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *[data-bettergravity-active="true"],
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *.bg-sidebar-secondary,
+body [role="navigation"][aria-label="Sidebar"][class] div[data-testid="conversation-row-sidebar"][data-selected="true"] {
+  background-color: var(--bg-theme-rail-2) !important;
+  color: var(--bg-theme-fg) !important;
+}
+
+body [role="navigation"][aria-label="Sidebar"] #gemini-top-fade {
+  background-image: linear-gradient(to bottom, var(--bg-theme-rail) 15%, transparent) !important;
+}
+
+body [role="menu"][data-gemini-conversation-menu] {
+  background: var(--bg-theme-card) !important;
+  background-color: var(--bg-theme-card) !important;
+}
+
+body #gemini-sidebar-user-pill .gemini-user-avatar-wrap {
+  background-color: var(--bg-theme-rail-2) !important;
+}
+
+
+/* ---- 9. 插件写死的文字色与 hover 表面 ----
+ * 3b 节拿回的是「表面」，这一节拿回的是「画在表面上的文字与 hover」。
+ * 插件在这几处没走 token，直接写了 #ffffff / #e6e6e6 / rgba(255,255,255,.08) ——
+ * 那是给深色轨道配的，浅色主题下就是白字压浅底、hover 看不见。
+ *
+ * 9.1 那条白字规则在插件里是**一条带 18 个选择器的复合规则**
+ * （[role=Sidebar] … .bg-sidebar-secondary > span:last-child 之类），
+ * 只抄其中一两个选择器，剩下的照样是白字 —— 所以这里把 18 个全抄过来，
+ * 统一加 body 前缀 + nav 上的 [class]，特异性从 (0,5,1) 提到 (0,6,2)，
+ * 无论插件那条规则挂在哪个样式表都压得住。
+ *
+ * 覆盖范围：侧栏 / 会话行 / 会话菜单 / 账号区。
+ * 会话**正文**区（代码块、表格、diff 高亮那 200 多处字面量）没在这里处理，
+ * 那是另一类问题，见 git 记录里的说明。 */
+
+/* 9.1 选中行的文字：插件那条 18 选择器的复合规则 */
+body [role="navigation"][aria-label="Sidebar"][class] [data-testid="new-conversation-button"].bg-sidebar-secondary > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] [data-testid="history-button"].bg-sidebar-secondary > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] [data-testid="automations-button"].bg-sidebar-secondary > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-skills-button.bg-sidebar-secondary > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scheduled-tasks-button.bg-sidebar-secondary > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] div.flex-col > a.bg-sidebar-secondary > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] [data-bettergravity-button][aria-pressed="true"] > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] [data-bettergravity-button][aria-selected="true"] > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] [data-bettergravity-button][data-active="true"] > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] [data-bettergravity-button][data-selected="true"] > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] [data-bettergravity-button][data-bettergravity-active="true"] > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] [data-bettergravity-button].bg-sidebar-secondary > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *[aria-pressed="true"] > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *[aria-selected="true"] > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *[data-active="true"] > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *[data-selected="true"] > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *[data-bettergravity-active="true"] > span:last-child,
+body [role="navigation"][aria-label="Sidebar"][class] #gemini-scroll-nav > *.bg-sidebar-secondary > span:last-child,
+body [data-testid="conversation-row-sidebar"][data-selected="true"] span.truncate {
+  color: var(--bg-theme-fg) !important;
+}
+
+/* 9.2 New Conversation 后面的快捷键角标（#c4c7c5，浅色底上几乎看不见） */
+body [role="navigation"][aria-label="Sidebar"] [data-testid="new-conversation-button"]::after {
+  color: var(--bg-theme-fg-muted) !important;
+}
+
+/* 9.3 会话行右侧的 kebab 与停止按钮 */
+body [data-testid="conversation-row-sidebar"] [data-testid="conversation-kebab"]:hover,
+body [data-testid="conversation-row-sidebar"] [data-testid="conversation-kebab"][aria-expanded="true"],
+body [data-testid="conversation-row-sidebar"] button[aria-label="Stop execution"]:hover {
+  color: var(--bg-theme-fg) !important;
+}
+
+/* 9.4 会话右键菜单：正文、图标、hover 态。插件同时用了 [role=menuitem] 与
+ * .gemini-menu-item 两套名字，两套都要接。 */
+body [role="menu"][data-gemini-conversation-menu] [role="menuitem"],
+body [role="menu"][data-gemini-conversation-menu] button[role="menuitem"],
+body [role="menu"][data-gemini-conversation-menu] .gemini-menu-item,
+body [role="menu"][data-gemini-conversation-menu] [role="menuitem"] span,
+body [role="menu"][data-gemini-conversation-menu] .gemini-menu-item span,
+body [role="menu"][data-gemini-conversation-menu] .gemini-menu-item-label,
+body .gemini-menu-item-label {
+  color: var(--bg-theme-fg) !important;
+}
+
+body [role="menu"][data-gemini-conversation-menu] [role="menuitem"]:hover,
+body [role="menu"][data-gemini-conversation-menu] [role="menuitem"]:focus,
+body [role="menu"][data-gemini-conversation-menu] [role="menuitem"]:focus-visible,
+body [role="menu"][data-gemini-conversation-menu] [role="menuitem"][data-highlighted],
+body [role="menu"][data-gemini-conversation-menu] .gemini-menu-item:hover,
+body [role="menu"][data-gemini-conversation-menu] .gemini-menu-item:hover span {
+  color: var(--bg-theme-fg) !important;
+}
+
+body [role="menu"][data-gemini-conversation-menu] [role="menuitem"]:hover,
+body [role="menu"][data-gemini-conversation-menu] [role="menuitem"]:focus,
+body [role="menu"][data-gemini-conversation-menu] [role="menuitem"][data-highlighted],
+body [role="menu"][data-gemini-conversation-menu] .gemini-menu-item:hover {
+  background-color: var(--gemini-row-hover) !important;
+}
+
+body [role="menu"][data-gemini-conversation-menu] [role="menuitem"] svg,
+body [role="menu"][data-gemini-conversation-menu] .gemini-menu-item svg,
+body .gemini-menu-item-slot svg {
+  color: var(--bg-theme-fg-muted) !important;
+}
+
+/* 9.5 侧栏那几个 8% 白 hover：浅色底上等于没有反馈 */
+body [role="navigation"][aria-label="Sidebar"][class] .gemini-logo-btn:hover,
+body [data-testid="sidebar-toggle"][aria-label]:hover,
+body .gemini-experience-collapsed-btn:hover {
+  background-color: var(--gemini-row-hover) !important;
+}
+
+/* 9.6 头像：插件是 #1a73e8 底 + 白字。底色与字色必须一起写 ——
+ * 只改底色就成了白字压浅底（上一版 3b 正是这么错的）。 */
+body #gemini-sidebar-user-pill .gemini-user-avatar-fallback {
+  background: var(--primary) !important;
+  background-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+
+
+/* ---- 4. AI 会话区 ---- */
+:root {
+  --gemini-page-bg: #1A1B26 !important;
+  --gemini-body-text: #A9B1D6 !important;
+  --gemini-bubble-bg: #1F2335 !important;
+  --gemini-link: #7AA2F7 !important;
+  --gemini-rule: rgba(122, 162, 247, 0.16) !important;
+  --gemini-inline-code-bg: rgba(122, 162, 247, 0.08) !important;
+  --gemini-inline-code-text: #E0AF68 !important;
+  --gemini-composer-bg: #1F2335 !important;
+  --gemini-composer-placeholder: #6B7394 !important;
+  --gemini-control-hover: #292E42 !important;
+  --gemini-stop-bg: #16161E !important;
+  --gemini-stop-bg-hover: #292E42 !important;
+  --gemini-mic-hover: rgba(169, 177, 214, 0.07) !important;
+  --gemini-send-bg: #3D59A1 !important;
+  --gemini-send-bg-hover: #4C6AB8 !important;
+  --gemini-chip-bg: #292E42 !important;
+  --gemini-home-glow-accent: rgb(31, 35, 53) !important;
+  --gemini-surface: #16161E !important;
+  --gemini-surface-hover: #292E42 !important;
+  --gemini-trigger-hover: #292E42 !important;
+  --gemini-text: #A9B1D6 !important;
+  --gemini-text-dim: #6B7394 !important;
+  --gemini-text-muted: #9AA5CE !important;
+  --gemini-text-trigger: #9AA5CE !important;
+  --gemini-text-trigger-hover: #A9B1D6 !important;
+  --gemini-switch-track: #16161E !important;
+  --gemini-switch-slider: #292E42 !important;
+  --gemini-row-hover: rgba(169, 177, 214, 0.07) !important;
+  --gemini-row-pressed: rgba(169, 177, 214, 0.11) !important;
+  --gemini-row-selected: #292E42 !important;
+  --gemini-separator: rgba(122, 162, 247, 0.16) !important;
+  --gemini-menu-divider: rgba(122, 162, 247, 0.16) !important;
+  --gemini-accent: #3D59A1 !important;
+  --gemini-selection-bg: rgba(122, 162, 247, 0.30) !important;
+  --gemini-theme-accent: #7AA2F7 !important;
+  --gemini-unread-dot-color: #7AA2F7 !important;
+  --gemini-menu-shadow: 0 4px 24px rgba(0, 0, 0, 0.45) !important;
+  --gemini-submenu-shadow: 0 4px 18px rgba(0, 0, 0, 0.34) !important;
+  --gemini-plus-menu-shadow: 0 0 20px rgba(0, 0, 0, 0.27) !important;
+  --gemini-control-shadow: 0 1px 2px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* ---- 4b. 顺序无关的强调色 ----
+ * 插件 index.js 会往 head 末尾塞一张动态样式表，用 :root { … !important } 写
+ * 这几个 token。与上面 4 节同特异性同重要性，谁在后面谁赢 —— 那是赌顺序。
+ * 这里用 :root:root 提到 (0,2,0)，无论插件什么时候重写都压得住。 */
+:root:root {
+  --gemini-home-glow-accent: rgb(31, 35, 53) !important;
+  --gemini-send-bg: #3D59A1 !important;
+  --gemini-send-bg-hover: #4C6AB8 !important;
+  --gemini-chip-bg: #292E42 !important;
+  --gemini-selection-bg: rgba(122, 162, 247, 0.30) !important;
+  --gemini-theme-accent: #7AA2F7 !important;
+  --gemini-unread-dot-color: #7AA2F7 !important;
+}
+
+/* ---- 5. 图表与状态色 ---- */
+:root {
+  --chart-blue: #7AA2F7 !important;
+  --chart-green: #9ECE6A !important;
+  --chart-purple: #BB9AF7 !important;
+  --chart-yellow: #E0AF68 !important;
+  --chart-orange: #FF9E64 !important;
+  --chart-red: #F7768E !important;
+  --color-link: var(--link) !important;
+  --color-error: var(--error) !important;
+  --color-warning: var(--warning) !important;
+  --color-success: var(--success) !important;
+}
+
+/* ---- 6. 编辑器面板 ---- */
+:root {
+  --vscode-editor-background: #1A1B26 !important;
+  --vscode-editor-foreground: #A9B1D6 !important;
+  --vscode-editorLineNumber-foreground: #6B7394 !important;
+  --vscode-editor-selectionBackground: rgba(122, 162, 247, 0.30) !important;
+  --vscode-editor-inactiveSelectionBackground: rgba(122, 162, 247, 0.30) !important;
+  --vscode-editorCursor-foreground: #3D59A1 !important;
+  --vscode-editorGutter-background: #1A1B26 !important;
+  --vscode-sideBar-background: #16161E !important;
+  --vscode-sideBar-foreground: #9AA5CE !important;
+  --vscode-sideBarTitle-background: #16161E !important;
+  --vscode-sideBarSectionHeader-background: #292E42 !important;
+  --vscode-activityBar-background: #292E42 !important;
+  --vscode-activityBar-foreground: #9AA5CE !important;
+  --vscode-activityBar-inactiveForeground: #6B7394 !important;
+  --vscode-activityBar-activeBorder: #3D59A1 !important;
+  --vscode-titleBar-activeBackground: #16161E !important;
+  --vscode-titleBar-activeForeground: #A9B1D6 !important;
+  --vscode-titleBar-inactiveBackground: #16161E !important;
+  --vscode-titleBar-inactiveForeground: #6B7394 !important;
+  --vscode-statusBar-background: #16161E !important;
+  --vscode-statusBar-foreground: #9AA5CE !important;
+  --vscode-statusBar-focusBorder: #9AA5CE !important;
+  --vscode-tab-activeBackground: #1A1B26 !important;
+  --vscode-tab-activeForeground: #A9B1D6 !important;
+  --vscode-tab-inactiveBackground: #16161E !important;
+  --vscode-tab-inactiveForeground: #6B7394 !important;
+  --vscode-tab-border: rgba(122, 162, 247, 0.16) !important;
+  --vscode-panel-background: #1A1B26 !important;
+  --vscode-panel-border: rgba(122, 162, 247, 0.16) !important;
+  --vscode-panelTitle-activeForeground: #A9B1D6 !important;
+  --vscode-panelTitle-inactiveForeground: #6B7394 !important;
+  --vscode-editorGroup-background: #16161E !important;
+  --vscode-editorGroup-border: rgba(122, 162, 247, 0.16) !important;
+  --vscode-editorGroupHeader-tabsBackground: #16161E !important;
+  --vscode-input-background: #16161E !important;
+  --vscode-input-foreground: #A9B1D6 !important;
+  --vscode-input-border: rgba(122, 162, 247, 0.16) !important;
+  --vscode-input-placeholderForeground: #6B7394 !important;
+  --vscode-button-background: #3D59A1 !important;
+  --vscode-button-foreground: #FFFFFF !important;
+  --vscode-button-hoverBackground: #4C6AB8 !important;
+  --vscode-button-secondaryBackground: #16161E !important;
+  --vscode-button-secondaryForeground: #A9B1D6 !important;
+  --vscode-focusBorder: #7AA2F7 !important;
+  --vscode-list-hoverBackground: #16161E !important;
+  --vscode-list-activeSelectionBackground: #292E42 !important;
+  --vscode-list-activeSelectionForeground: #A9B1D6 !important;
+  --vscode-list-inactiveSelectionBackground: #16161E !important;
+  --vscode-list-highlightForeground: #7AA2F7 !important;
+  --vscode-quickInput-background: #1F2335 !important;
+  --vscode-dropdown-background: #1F2335 !important;
+  --vscode-dropdown-border: rgba(122, 162, 247, 0.16) !important;
+  --vscode-editorWidget-background: #1F2335 !important;
+  --vscode-editorWidget-border: rgba(122, 162, 247, 0.16) !important;
+  --vscode-editorHoverWidget-background: #1F2335 !important;
+  --vscode-editorSuggestWidget-background: #1F2335 !important;
+  --vscode-menu-background: #1F2335 !important;
+  --vscode-menu-selectionBackground: #292E42 !important;
+  --vscode-menu-selectionForeground: #A9B1D6 !important;
+  --vscode-textLink-foreground: #7AA2F7 !important;
+  --vscode-textLink-activeForeground: #4C6AB8 !important;
+  --vscode-textCodeBlock-background: rgba(122, 162, 247, 0.08) !important;
+  --vscode-textPreformat-foreground: #E0AF68 !important;
+  --vscode-textBlockQuote-background: #16161E !important;
+  --vscode-textBlockQuote-border: #3D59A1 !important;
+  --vscode-editorError-foreground: #F7768E !important;
+  --vscode-editorWarning-foreground: #E0AF68 !important;
+  --vscode-editorInfo-foreground: #7AA2F7 !important;
+  --vscode-errorForeground: #F7768E !important;
+  --vscode-descriptionForeground: #6B7394 !important;
+  --vscode-icon-foreground: #9AA5CE !important;
+  --vscode-badge-background: #3D59A1 !important;
+  --vscode-badge-foreground: #FFFFFF !important;
+  --vscode-scrollbarSlider-background: rgba(169, 177, 214, 0.22) !important;
+  --vscode-scrollbarSlider-hoverBackground: rgba(169, 177, 214, 0.22) !important;
+  --vscode-scrollbarSlider-activeBackground: rgba(169, 177, 214, 0.22) !important;
+  --vscode-widget-shadow: rgba(0, 0, 0, 0.30) !important;
+}
+
+/* ---- 7. 滚动条 ---- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+  background-color: rgba(169, 177, 214, 0.22);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #3D59A1;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- 8. 窗口顶部强调线（装饰，可删） ---- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 2147483000;
+  background: linear-gradient(90deg, #3D59A1, transparent 60%);
+  pointer-events: none;
+}
+

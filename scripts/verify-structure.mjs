@@ -18,7 +18,7 @@ const required = [
   "examples/plugins/session-timer/plugin.json",
   "community/README.md",
   "community/catalog.json",
-  "community/themes/midnight.css",
+  "community/themes/README.md",
   "packages/plugin-api/src/index.ts",
   "packages/theme-api/src/index.ts",
   "packages/marketplace/src/index.ts",

@@ -226,7 +226,7 @@ function openAddFromUrl(api: BetterGravityApi, callbacks: SectionCallbacks): voi
 }
 
 function installedThemeRows(state: RuntimeState, api: BetterGravityApi, callbacks: SectionCallbacks): readonly Node[] {
-  const themes = state.themes.filter((theme) => matches(callbacks.query, theme.name, theme.description, theme.author));
+  const themes = state.themes.filter((theme) => matches(callbacks.query, theme.name, theme.id));
 
   if (state.themes.length === 0) {
     return [
@@ -239,9 +239,12 @@ function installedThemeRows(state: RuntimeState, api: BetterGravityApi, callback
 
   return themes.map((theme) => {
     const update = updateAction(theme.id, "theme", theme.version, callbacks);
+    // A theme is its palette. The header's author, version and description are
+    // provenance for the catalogue, not something to read on the row: the name
+    // and the switch are the whole of what a user decides with.
     return settingRow(
       theme.name,
-      [theme.description, credit(theme.author, theme.version) + (theme.folder ? " · folder" : "")].filter(Boolean).join("\n"),
+      undefined,
       controlGroup([
         update,
         iconButton(ICON.folder, `Show ${theme.id} in Explorer`, () => void api.content.reveal("theme", theme.id)),

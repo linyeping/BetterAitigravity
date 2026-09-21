@@ -371,6 +371,18 @@ describe("the Themes screen", () => {
     expect(fake.calls).toContain("remove:theme:midnight.css");
   });
 
+  // A theme is its palette. The header's author, version and description are
+  // provenance for the catalogue; reading them on every row is noise.
+  it("shows a theme as a name and a switch, not the catalogue's prose", async () => {
+    fake.state = runtimeState({ themes: [theme("claude-light.css", true)] });
+    await open("Themes");
+
+    expect(textIn("Themes")).toContain("claude-light");
+    expect(textIn("Themes")).not.toContain("A theme.");
+    expect(textIn("Themes")).not.toContain("someone");
+    expect(textIn("Themes")).not.toContain("1.0.0");
+  });
+
   it("turns one on through the settings patch", async () => {
     fake.state = runtimeState({ themes: [theme("dawn.css", false)] });
     await open("Themes");

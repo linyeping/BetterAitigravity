@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-21T09:13:57.617Z",
+  "generatedAt": "2026-09-21T11:38:35.741Z",
   "entries": [
     {
       "id": "compact",
@@ -981,38 +981,62 @@
       ]
     },
     {
-      "id": "catppuccin-turbo.css",
+      "id": "claude-dark.css",
       "kind": "theme",
-      "name": "Catppuccin Turbo",
-      "description": "Ultra-fast, zero-latency Catppuccin Mocha theme. Removes blur/shadow GPU lag, neutralizes sluggish entrance keyframes, and applies sleek, high-contrast dark tones.",
-      "version": "1.0.1",
-      "author": "Antigravity",
-      "source": "https://github.com/catppuccin/catppuccin",
-      "path": "community/themes/catppuccin-turbo.css",
-      "bytes": 8452,
+      "name": "Claude Dark",
+      "source": "https://github.com/linyeping/BetterAitigravity",
+      "path": "community/themes/claude-dark.css",
+      "bytes": 21525,
       "files": [
         {
-          "name": "catppuccin-turbo.css",
-          "bytes": 8452,
-          "sha256": "b342630527b99ec3b5f8a6433634a0f36e4089de4fbffdde8c6b841475d39475"
+          "name": "claude-dark.css",
+          "bytes": 21525,
+          "sha256": "3a654b1cf2767010eea89582e4baf78981f7f16ee1b5337a3859e2ab12816cb0"
         }
       ]
     },
     {
-      "id": "midnight.css",
+      "id": "claude-light.css",
       "kind": "theme",
-      "name": "Midnight",
-      "description": "A quiet accent line, softer selection, and slimmer scrollbars.",
-      "version": "1.0.0",
-      "author": "BetterGravity Contributors",
-      "source": "https://github.com/YashjitPal/BetterGravity",
-      "path": "community/themes/midnight.css",
-      "bytes": 1404,
+      "name": "Claude Light",
+      "source": "https://github.com/linyeping/BetterAitigravity",
+      "path": "community/themes/claude-light.css",
+      "bytes": 21476,
       "files": [
         {
-          "name": "midnight.css",
-          "bytes": 1404,
-          "sha256": "a82bf7342d21a88a1e1202806f4c439a3e3592b56647208fd686afaae369e0d0"
+          "name": "claude-light.css",
+          "bytes": 21476,
+          "sha256": "1f554375a2c89abe63ed2ea2657a2ae3d24aad73bab9dedfc2049244bcd59e2f"
+        }
+      ]
+    },
+    {
+      "id": "codex-light.css",
+      "kind": "theme",
+      "name": "Codex Light",
+      "source": "https://github.com/linyeping/BetterAitigravity",
+      "path": "community/themes/codex-light.css",
+      "bytes": 21464,
+      "files": [
+        {
+          "name": "codex-light.css",
+          "bytes": 21464,
+          "sha256": "92b84ecfde02fee7af32e96f16b4c9d57821bac2bc3731313b6f617707922ac2"
+        }
+      ]
+    },
+    {
+      "id": "tokyo-night.css",
+      "kind": "theme",
+      "name": "Tokyo Night",
+      "source": "https://github.com/linyeping/BetterAitigravity",
+      "path": "community/themes/tokyo-night.css",
+      "bytes": 21526,
+      "files": [
+        {
+          "name": "tokyo-night.css",
+          "bytes": 21526,
+          "sha256": "4b52302b6ff5dfd09b444157ebd490bbffb53d614ab786037d3d2cd3e5112b8f"
         }
       ]
     }

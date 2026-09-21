@@ -5,11 +5,12 @@
  *
  *   /**
  *    * @name        Midnight
- *    * @description A calm dark theme.
- *    * @author      someone
- *    * @version     1.0.0
  *    * @source      https://github.com/someone/midnight
  *    *\/
+ *
+ * Only `@name` is required. A theme is its palette, so the fields that used to
+ * fill the settings list — description, author, version — are optional now:
+ * carry them if they say something worth carrying, leave them out otherwise.
  */
 
 export interface ThemeMetadata {
@@ -57,9 +58,9 @@ export function parseThemeMetadata(css: string): ThemeMetadata {
   return Object.fromEntries(Object.entries(metadata).filter(([, value]) => value !== undefined));
 }
 
-/** A starting header for new themes. */
+/** A starting header for new themes: the name, and nothing else required. */
 export function themeMetadataTemplate(name: string): string {
-  return ["/**", ` * @name        ${name}`, " * @description ", " * @author      ", " * @version     1.0.0", " */", ""].join("\n");
+  return ["/**", ` * @name        ${name}`, " */", ""].join("\n");
 }
 
 export interface RemoteThemeStub {
@@ -104,9 +105,6 @@ export function remoteThemeStub(input: string): RemoteThemeStub | undefined {
   const css = [
     "/**",
     ` * @name        ${displayName || "Remote theme"}`,
-    ` * @description Loaded from ${safeUrl}`,
-    " * @author      Unknown",
-    " * @version     1.0.0",
     ` * @source      ${safeUrl}`,
     " */",
     "",

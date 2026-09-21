@@ -246,5 +246,6 @@ to the reviewer, since the review covers the stub and not what the link serves.
 The rules are in [the community README](../community/README.md), and
 `pnpm community:check` runs the same validation CI does.
 
-A complete example lives in
-[`community/themes/midnight.css`](../community/themes/midnight.css).
+The header comment, a `:root` block, and `!important` on every declaration is the
+whole of what the runtime needs — [the community README](../community/README.md)
+lists the header fields, of which only `@name` is required.

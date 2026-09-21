@@ -6,7 +6,7 @@ refers to — partial stylesheets, fonts, images.
 
 ```text
 themes/
-├── midnight.css          a single-file theme
+├── paper.css             a single-file theme
 └── gemini-app/           a folder theme
     ├── theme.css         the entry; the header lives here
     ├── parts/menus.css
@@ -16,9 +16,6 @@ themes/
 ```css
 /**
  * @name        Midnight Blue
- * @description A calm dark theme.
- * @author      your name
- * @version     1.0.0
  * @source      https://github.com/you/midnight-blue
  */
 
@@ -27,9 +24,12 @@ themes/
 }
 ```
 
-`@name`, `@description`, `@author`, and `@version` are required. `@source` is
-optional. A theme may `@import` a stylesheet hosted elsewhere over `https`; the
-reviewer is told where it points.
+`@name` is the only field a theme has to carry — a theme is its palette, and the
+settings list shows the name and a switch, so the rest is noise there.
+`@description`, `@author`, `@version` and `@source` are optional: carry them if
+they say something worth carrying, leave them out otherwise. A theme may
+`@import` a stylesheet hosted elsewhere over `https`; the reviewer is told where
+it points.
 
 Writing one is covered in [the theme guide](../../docs/themes.md). Submission
 rules are in [the community README](../README.md).
