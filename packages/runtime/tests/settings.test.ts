@@ -391,6 +391,40 @@ describe("the Themes screen", () => {
     expect(fake.patches).toEqual([{ themes: { enabled: ["dawn.css"] } }]);
   });
 
+  // Themes are exclusive: Antigravity paints one palette, so switching one on
+  // switches the other off in the same patch — live, with nothing overlapping.
+  it("switches the previous theme off when another is turned on", async () => {
+    fake.state = runtimeState({
+      settings: {
+        schemaVersion: 1,
+        themes: { enabled: ["midnight.css"] },
+        plugins: { developerMode: false, enabled: [] },
+        reapplyAfterHostUpdate: true
+      },
+      themes: [theme("midnight.css", true), theme("dawn.css", false)]
+    });
+    await open("Themes");
+    labelledIn("Themes", "Enable dawn")?.click();
+
+    expect(fake.patches).toEqual([{ themes: { enabled: ["dawn.css"] } }]);
+  });
+
+  it("leaves no theme on when the active one is switched off", async () => {
+    fake.state = runtimeState({
+      settings: {
+        schemaVersion: 1,
+        themes: { enabled: ["midnight.css"] },
+        plugins: { developerMode: false, enabled: [] },
+        reapplyAfterHostUpdate: true
+      },
+      themes: [theme("midnight.css", true)]
+    });
+    await open("Themes");
+    labelledIn("Themes", "Enable midnight")?.click();
+
+    expect(fake.patches).toEqual([{ themes: { enabled: [] } }]);
+  });
+
   it("reports what happened, since the change lands out of view", async () => {
     fake.nextResult = { ok: true, message: "Added 1 theme." };
     await open("Themes");

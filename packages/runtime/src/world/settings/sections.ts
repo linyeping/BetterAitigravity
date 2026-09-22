@@ -43,6 +43,16 @@ function toggled(list: readonly string[], id: string): string[] {
   return list.includes(id) ? list.filter((entry) => entry !== id) : [...list, id];
 }
 
+/**
+ * Themes are exclusive: Antigravity paints one palette, so switching one on
+ * switches the previous one off and switching the active one off leaves none.
+ * The change is live — the stylesheet set is replaced on the next state
+ * broadcast, with no reload — so the two never overlap in between.
+ */
+function soleTheme(list: readonly string[], id: string): string[] {
+  return list.includes(id) ? [] : [id];
+}
+
 function run(action: Promise<ContentResult>, callbacks: SectionCallbacks): void {
   void action.then((result) => {
     // A cancelled dialog reports neither success nor a message; say nothing.
@@ -256,7 +266,7 @@ function installedThemeRows(state: RuntimeState, api: BetterGravityApi, callback
         iconButton(ICON.folder, `Show ${theme.id} in Explorer`, () => void api.content.reveal("theme", theme.id)),
         iconButton(ICON.trash, `Delete ${theme.name}`, () => run(api.content.remove("theme", theme.id, theme.name), callbacks)),
         nativeSwitch(theme.enabled, `Enable ${theme.name}`, () => {
-          void api.setSettings({ themes: { enabled: toggled(state.settings.themes.enabled, theme.id) } });
+          void api.setSettings({ themes: { enabled: soleTheme(state.settings.themes.enabled, theme.id) } });
         })
       ].filter((node): node is Node => node !== undefined))
     );

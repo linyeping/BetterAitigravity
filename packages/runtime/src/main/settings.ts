@@ -7,6 +7,17 @@ function uniqueStrings(value: unknown, fallback: readonly string[]): readonly st
 }
 
 /**
+ * A theme is a whole palette rather than a layer, so only one is ever on and
+ * switching happens live. The setting stays a list so the on-disk format is
+ * unchanged, but it is capped to its last entry — the id chosen most recently.
+ * Without the cap a file left with two on would have the winner decided by mount
+ * order, which is not a choice anybody made.
+ */
+function soleTheme(value: unknown, fallback: readonly string[]): readonly string[] {
+  return uniqueStrings(value, fallback).slice(-1);
+}
+
+/**
  * Settings are user-editable on disk, so every read is treated as untrusted and
  * normalised back to a known shape rather than trusted as parsed.
  */
@@ -16,7 +27,7 @@ export function normalizeSettings(value: unknown): RuntimeSettings {
   const plugins = (candidate["plugins"] ?? {}) as Record<string, unknown>;
   return {
     schemaVersion: 1,
-    themes: { enabled: uniqueStrings(themes["enabled"], DEFAULT_SETTINGS.themes.enabled) },
+    themes: { enabled: soleTheme(themes["enabled"], DEFAULT_SETTINGS.themes.enabled) },
     plugins: {
       developerMode: plugins["developerMode"] === true,
       enabled: uniqueStrings(plugins["enabled"], DEFAULT_SETTINGS.plugins.enabled)
