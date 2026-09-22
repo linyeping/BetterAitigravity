@@ -228,7 +228,9 @@ export async function installEntry(
     return { ok: false, message: `Could not write ${entry.name} to disk.` };
   }
 
-  if (updating) return { ok: true, message: `Updated ${entry.name} to ${entry.version}.` };
+  if (updating) {
+    return { ok: true, message: entry.version ? `Updated ${entry.name} to ${entry.version}.` : `Updated ${entry.name}.` };
+  }
   return {
     ok: true,
     message:

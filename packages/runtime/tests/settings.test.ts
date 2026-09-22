@@ -570,6 +570,16 @@ describe("version comparison", () => {
     expect(isNewer("2024-05-01", "1.0.0")).toBe(true);
     expect(isNewer("beta", "alpha")).toBe(true);
   });
+
+  // A theme only has to declare @name, so its listing carries no version at all.
+  // There is nothing to compare, and reading one as a string is a crash rather
+  // than a wrong answer.
+  it("treats a missing version on either side as nothing to compare", () => {
+    expect(isNewer(undefined, "1.0.0")).toBe(false);
+    expect(isNewer("1.0.0", undefined)).toBe(false);
+    expect(isNewer(undefined, undefined)).toBe(false);
+    expect(isNewer("", "1.0.0")).toBe(false);
+  });
 });
 
 /**

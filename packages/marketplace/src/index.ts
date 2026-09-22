@@ -39,9 +39,15 @@ export interface CatalogEntry {
   readonly id: string;
   readonly kind: ContentKind;
   readonly name: string;
-  readonly description: string;
-  readonly version: string;
-  readonly author: string;
+  /**
+   * Provenance a submission may carry. Optional because a theme is its palette:
+   * only `@name` is required in the header, so a theme listing routinely has
+   * none of these, and a consumer has to read them as absent rather than as an
+   * empty string.
+   */
+  readonly description?: string;
+  readonly version?: string;
+  readonly author?: string;
   /** Where the author publishes it. The repository remains the source of truth. */
   readonly source?: string;
   /** Supported OS platforms (e.g. ["windows"]). Omitted if universal. */

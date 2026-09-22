@@ -51,11 +51,17 @@ function run(action: Promise<ContentResult>, callbacks: SectionCallbacks): void 
   });
 }
 
-const credit = (author: string, version: string) => `${author} · ${version}`;
+/**
+ * "author · version", from whichever of the two the listing carries. A theme
+ * carries neither unless its header declares them, and a row that prints the
+ * word "undefined" is worse than one that prints nothing.
+ */
+const credit = (author: string | undefined, version: string | undefined): string =>
+  [author, version].filter((part): part is string => Boolean(part)).join(" · ");
 
-const matches = (query: string, ...fields: readonly string[]): boolean => {
+const matches = (query: string, ...fields: readonly (string | undefined)[]): boolean => {
   if (query === "") return true;
-  const haystack = fields.join(" ").toLowerCase();
+  const haystack = fields.filter((field): field is string => typeof field === "string").join(" ").toLowerCase();
   return query
     .toLowerCase()
     .split(/\s+/)

@@ -30,9 +30,15 @@ export interface CatalogStore {
  * covers ordinary semver without pretending to implement it. Anything else
  * falls back to "different means newer", so an update is offered rather than
  * silently withheld.
+ *
+ * An absent version on either side is not a version to compare: a theme only
+ * has to declare `@name`, so its listing carries no version at all, and there
+ * is nothing to say about whether what you have is current. That reads as "no
+ * update", and it is also what keeps the caller from splitting `undefined`.
  */
-export function isNewer(candidate: string, installed: string): boolean {
+export function isNewer(candidate: string | undefined, installed: string | undefined): boolean {
   if (candidate === installed) return false;
+  if (!candidate || !installed) return false;
 
   const left = candidate.split(".");
   const right = installed.split(".");
