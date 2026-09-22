@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.5] - 2026-09-22
+
+### Fixed
+
+- **The Themes screen no longer goes blank.** 3.0.4 made `@version` optional for
+  themes and stopped serialising annotations a header does not declare, which left
+  every theme listing in the community catalog without a version — while the themes
+  screen still read that field as a string. An installed theme whose id matched a
+  listing (`claude-light.css`, once the four palettes were added to the catalog) sent
+  `undefined` into the version comparison, whose first act is `candidate.split(".")`.
+  The throw was caught per section, so the dialog kept its nav and the whole right
+  hand panel stayed empty, retrying and failing on every re-render.
+
+  `isNewer` now reads a missing version on either side as "nothing to compare", which
+  means no update is offered. `CatalogEntry.description`, `.version` and `.author`
+  are typed optional rather than as strings the catalog does not always carry, and
+  the one row that credits a listing no longer prints the word `undefined`.
+
 ## [3.0.4] - 2026-09-21
 
 ### Added

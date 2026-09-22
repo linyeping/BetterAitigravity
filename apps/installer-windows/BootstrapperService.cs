@@ -27,7 +27,7 @@ public class RemoteManifest
 
 public static class BootstrapperService
 {
-    public const string EmbeddedVersion = "3.0.4";
+    public const string EmbeddedVersion = "3.0.5";
     private const string ManifestUrl = "https://raw.githubusercontent.com/linyeping/BetterAitigravity/main/apps/installer-windows/Patcher/manifest.json";
     private const string RawBaseUrl = "https://raw.githubusercontent.com/linyeping/BetterAitigravity/main/";
 
