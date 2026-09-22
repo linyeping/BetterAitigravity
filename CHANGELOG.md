@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.6] - 2026-09-22
+
+### Changed
+
+- **Themes are exclusive: turning one on turns the previous one off.** Antigravity
+  paints one palette, so switching now happens in a single settings patch — the
+  stylesheet set is replaced on the next state broadcast, with no reload and no
+  window in which two themes overlap. Turning the active theme off leaves none on.
+  The setting stays a list on disk for compatibility, but it is capped to its last
+  entry, so a file left with two themes on (hand-edited, or written by an earlier
+  build) can no longer let mount order decide the winner.
+
 ## [3.0.5] - 2026-09-22
 
 ### Fixed
